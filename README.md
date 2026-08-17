@@ -369,8 +369,15 @@ product identity.
          alt="Buy me a coffee and support Codex Away"
          height="40">
   </a>
+  &nbsp;
+  <a href="https://buy.stripe.com/5kQ3cx2FwdjZcxf1am18c00">
+    <img src="https://img.shields.io/badge/Leave_a_Tip-635BFF?style=for-the-badge&amp;logo=stripe&amp;logoColor=white"
+         alt="Leave a tip through Stripe to support Codex Away"
+         height="40">
+  </a>
 </p>
 
 Sponsor ongoing development through [GitHub Sponsors](https://github.com/sponsors/akibrhast),
-or make a one-time contribution through [Buy Me a Coffee](https://buymeacoffee.com/akibrhast).
+or leave a one-time tip through [Buy Me a Coffee](https://buymeacoffee.com/akibrhast)
+or [Stripe](https://buy.stripe.com/5kQ3cx2FwdjZcxf1am18c00).
 Support is entirely optional and does not affect access to the project or its features.
