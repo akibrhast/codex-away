@@ -37,7 +37,33 @@ curl -fsSL https://raw.githubusercontent.com/akibrhast/codex-away/main/install.s
 > ChatGPT app for iPhone. The Android app does not currently expose this
 > option, so Codex Away cannot be controlled from Android yet.
 
-Once installed, plug in and lock your Mac. That is it.
+### First-time Remote Control setup
+
+Codex Away manages Remote Control after setup, but it does not pair your Mac
+and iPhone for you. If you have not used Codex Remote before:
+
+1. Start Remote Control on the Mac:
+
+   ```sh
+   codex remote-control start
+   ```
+
+2. In another Terminal window, create a short-lived pairing code:
+
+   ```sh
+   codex remote-control pair
+   ```
+
+3. Open **Remote** in the ChatGPT app on your iPhone and follow its pairing
+   instructions using the code shown on the Mac.
+4. After pairing succeeds, stop the manually started setup session:
+
+   ```sh
+   codex remote-control stop
+   ```
+
+Pairing is normally required only once. After that, plug in and lock your Mac;
+Codex Away starts and stops Remote Control automatically.
 
 ## How it works
 
