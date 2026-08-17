@@ -127,4 +127,33 @@ If the listener does not start, inspect:
 cat "$HOME/Library/Application Support/CodexRemoteOnLock/launchd-error.log"
 ```
 
+### Remote commands hang in Desktop or Downloads threads
+
+macOS protects folders such as `Desktop` and `Downloads` with Files and
+Folders privacy controls. The first time the background Codex process resumes
+a thread whose working directory is one of these locations, macOS may request
+permission to access that folder.
+
+If the Mac is locked, the permission dialog is not visible on the remote
+device. The iOS app can still display and continue the thread, but even simple
+commands such as `pwd` or `date` may appear to hang. Interrupted commands can
+then report exit code `130`. This is separate from Codex command approval and
+does not indicate a problem with the file being accessed.
+
+To fix it:
+
+1. Unlock the Mac and approve the macOS prompts for Desktop and Downloads
+   access.
+2. Open **System Settings → Privacy & Security → Files and Folders** and verify
+   that the relevant folder access is enabled for Codex.
+3. Lock the Mac again. This LaunchAgent will restart Remote Control with the
+   newly granted permissions.
+4. Send a fresh read-only command, such as `pwd`, from an existing Desktop or
+   Downloads thread in the iOS app.
+
+Ordinary commands should then complete normally. A command that changes or
+deletes files may still require a separate Codex approval. Full Disk Access is
+broader than necessary and should not be granted unless Files and Folders
+permissions prove insufficient.
+
 To reinstall after changing the source, run `./install.sh` again. It recompiles the listener, replaces the installed binary, and reloads the LaunchAgent.
