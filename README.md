@@ -1,5 +1,7 @@
 # Codex Away
 
+![Codex Away — Lock it. Leave it. Keep coding.](codex-remote-banner.png)
+
 **Lock it. Leave it. Keep coding.**
 
 Codex Away automatically makes your Mac available through Codex Remote when
