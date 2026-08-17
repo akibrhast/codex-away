@@ -34,26 +34,10 @@ curl -fsSL https://raw.githubusercontent.com/akibrhast/codex-away/main/install.s
 
 Once installed, plug in and lock your Mac. That is it.
 
-## Why this exists
+## How it works
 
-Codex Remote already provides conversations, approvals, authentication, and a
-mobile interface. The remaining friction is preparing the Mac before leaving:
-
-- enable Remote Control
-- make sure the Mac stays awake
-- leave it connected to power
-- remember to undo everything after returning
-
-Codex Away removes that preparation:
-
-```text
-Lock your Mac   = I might want it remotely.
-Unlock your Mac = I am back.
-```
-
-That is the entire interaction model.
-
-## How it behaves
+Your lock screen is the switch: lock to make the Mac available remotely;
+unlock to return it to normal.
 
 ```mermaid
 flowchart TD
