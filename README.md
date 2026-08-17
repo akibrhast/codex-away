@@ -157,3 +157,32 @@ broader than necessary and should not be granted unless Files and Folders
 permissions prove insufficient.
 
 To reinstall after changing the source, run `./install.sh` again. It recompiles the listener, replaces the installed binary, and reloads the LaunchAgent.
+
+## Development
+
+The project is organized as a Swift package:
+
+```text
+Sources/
+├── RemoteDevCore/       State, policy, and policy evaluation
+└── RemoteDevDaemon/     macOS events and service control
+
+Tests/
+└── RemoteDevCoreTests/  Unit tests for core policy behavior
+```
+
+Run the test suite:
+
+```sh
+swift test
+```
+
+Build the release executable without installing or reloading the LaunchAgent:
+
+```sh
+swift build --configuration release --product codex-remote-on-lock
+```
+
+The daemon currently runs with an automatic policy requiring both a locked
+screen and AC power. The core also defines force-on and force-off modes for a
+future CLI, but they are not exposed to users yet.

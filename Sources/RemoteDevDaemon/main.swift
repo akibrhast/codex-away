@@ -1,10 +1,14 @@
 import AppKit
 import Foundation
 import IOKit.ps
+import RemoteDevCore
 
+@MainActor
 final class Controller {
     private let homeDirectory = FileManager.default.homeDirectoryForCurrentUser
-    private var locked = false
+    private let mode = ControllerMode.automatic
+    private let policy = RemoteDevPolicy()
+    private var machineState: MachineState
     private var caffeinate: Process?
 
     private var codex: String { homeDirectory.appendingPathComponent(".codex/packages/standalone/current/codex").path }
@@ -13,8 +17,11 @@ final class Controller {
     private var logFile: URL { stateDirectory.appendingPathComponent("controller.log") }
 
     init() {
+        machineState = MachineState(
+            isLocked: Self.readInitialLockState(),
+            isOnACPower: Self.isOnACPower()
+        )
         try? FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true)
-        locked = Self.readInitialLockState()
     }
 
     func start() {
@@ -24,14 +31,18 @@ final class Controller {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.handleLockedEvent(source: "distributed screen-lock notification")
+            MainActor.assumeIsolated {
+                self?.handleLockedEvent(source: "distributed screen-lock notification")
+            }
         }
         distributed.addObserver(
             forName: Notification.Name("com.apple.screenIsUnlocked"),
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.handleUnlockedEvent(source: "distributed screen-unlock notification")
+            MainActor.assumeIsolated {
+                self?.handleUnlockedEvent(source: "distributed screen-unlock notification")
+            }
         }
 
         NSWorkspace.shared.notificationCenter.addObserver(
@@ -39,7 +50,9 @@ final class Controller {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.handleSessionResigned()
+            MainActor.assumeIsolated {
+                self?.handleSessionResigned()
+            }
         }
 
         NSWorkspace.shared.notificationCenter.addObserver(
@@ -47,26 +60,29 @@ final class Controller {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.handleUnlockedEvent(source: "user session became active")
+            MainActor.assumeIsolated {
+                self?.handleUnlockedEvent(source: "user session became active")
+            }
         }
 
-        log("event listener active; initial lock state: \(locked); AC power: \(Self.isOnACPower())")
+        log("event listener active; initial lock state: \(machineState.isLocked); AC power: \(machineState.isOnACPower)")
         reconcile(reason: "listener started")
     }
 
     func powerSourceChanged() {
-        log("power-source event; AC power: \(Self.isOnACPower())")
+        machineState.isOnACPower = Self.isOnACPower()
+        log("power-source event; AC power: \(machineState.isOnACPower)")
         reconcile(reason: "power source changed")
     }
 
     private func handleLockedEvent(source: String) {
-        locked = true
+        machineState.isLocked = true
         log("lock event received from \(source)")
         reconcile(reason: source)
     }
 
     private func handleUnlockedEvent(source: String) {
-        locked = false
+        machineState.isLocked = false
         log("unlock event received from \(source)")
         reconcile(reason: source)
     }
@@ -84,7 +100,7 @@ final class Controller {
     }
 
     private func reconcile(reason: String) {
-        if locked && Self.isOnACPower() {
+        if shouldEnableRemoteDev(mode: mode, machine: machineState, policy: policy) {
             startManagedServices(reason: reason)
         } else {
             stopManagedServices(reason: reason)
@@ -214,7 +230,9 @@ controller.start()
 
 let powerCallback: IOPowerSourceCallbackType = { context in
     guard let context else { return }
-    Unmanaged<Controller>.fromOpaque(context).takeUnretainedValue().powerSourceChanged()
+    MainActor.assumeIsolated {
+        Unmanaged<Controller>.fromOpaque(context).takeUnretainedValue().powerSourceChanged()
+    }
 }
 
 let context = Unmanaged.passUnretained(controller).toOpaque()

@@ -23,12 +23,11 @@ fi
 
 mkdir -p "$support_dir" "$launch_agents_dir"
 
-xcrun swiftc \
-  -module-cache-path "$build_dir/module-cache" \
-  "$project_dir/CodexRemoteOnLock.swift" \
-  -o "$build_dir/codex-remote-on-lock" \
-  -framework AppKit \
-  -framework IOKit
+swift build \
+  --package-path "$project_dir" \
+  --scratch-path "$build_dir/build" \
+  --configuration release \
+  --product codex-remote-on-lock
 
 sed "s|__HOME__|$HOME|g" \
   "$project_dir/com.openai.codex.remote-on-lock.plist.template" \
@@ -37,7 +36,7 @@ sed "s|__HOME__|$HOME|g" \
 plutil -lint "$build_dir/$label.plist"
 launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
 
-install -m 700 "$build_dir/codex-remote-on-lock" "$support_dir/codex-remote-on-lock"
+install -m 700 "$build_dir/build/release/codex-remote-on-lock" "$support_dir/codex-remote-on-lock"
 install -m 600 "$build_dir/$label.plist" "$plist"
 launchctl bootstrap "gui/$(id -u)" "$plist"
 
