@@ -75,9 +75,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
-            "$RUNNER_TEMP/release/codex-away-macos-universal.tar.gz" \
-            "$RUNNER_TEMP/release/codex-away-macos-universal.tar.gz.sha256" \
-            --title "Codex Away $GITHUB_REF_NAME" \
-            --generate-notes \
-            --verify-tag
+          archive="$RUNNER_TEMP/release/codex-away-macos-universal.tar.gz"
+          checksum="$archive.sha256"
+
+          for attempt in 1 2 3 4 5; do
+            if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+              gh release upload "$GITHUB_REF_NAME" "$archive" "$checksum" --clobber && exit 0
+            else
+              gh release create "$GITHUB_REF_NAME" "$archive" "$checksum" \
+                --title "Codex Away $GITHUB_REF_NAME" \
+                --generate-notes \
+                --verify-tag && exit 0
+            fi
+
+            if [[ "$attempt" -lt 5 ]]; then
+              echo "GitHub release publish attempt $attempt failed; retrying..."
+              sleep $((attempt * 10))
+            fi
+          done
+
+          echo "GitHub release publishing failed after 5 attempts" >&2
+          exit 1
