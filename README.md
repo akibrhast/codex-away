@@ -1,53 +1,87 @@
-# Codex Remote on Lock
+# Codex Away
 
-Codex Remote on Lock is a small, event-driven macOS LaunchAgent for making a Mac available through Codex Remote only when it is unattended and connected to power.
+**Lock it. Leave it. Keep coding.**
 
-When the screen locks while the Mac is using AC power, it starts:
+Codex Away automatically makes your Mac available through Codex Remote when
+you step away.
 
-- `codex remote-control start`
-- `caffeinate -s`, preventing system sleep while AC power remains connected
+Lock your Mac while it is plugged in and Codex Away enables Remote Control,
+keeps the machine awake, monitors the managed services, and recovers from
+process failures. Unlock the Mac or disconnect power and everything returns to
+normal.
 
-When the screen unlocks or AC power is disconnected, it stops both. The listener uses macOS session notifications and IOKit power-source events; it does not poll on a timer.
+It is for people who occasionally want to continue their Codex work from an
+iPhone without carrying a MacBook everywhere “just in case.”
 
-## Project status
+> Leave your Mac behind without losing the ability to continue working from
+> your phone.
 
-The primary locked + AC workflow is complete and in daily use. Its automated
-and manual acceptance evidence is recorded in
-[Reliability acceptance testing](docs/reliability-testing.md); the current
-suite contains 73 passing tests.
+## Why this exists
 
-There are no active implementation milestones. Remaining ideas are deliberately
-trigger-based:
+Codex Remote already provides conversations, approvals, authentication, and a
+mobile interface. The remaining friction is preparing the Mac before leaving:
 
-- Revisit sleep/wake recovery only if the managed `caffeinate -s` assertion
-  fails to keep the Mac awake in real use.
-- Revisit dedicated network recovery only after a repeatable reconnection
-  failure.
-- Revisit captive-portal retention only if guest-network expiration becomes a
-  recurring problem worth automating.
-- Consider a menu-bar UI or diagnostic CLI only if daily use demonstrates a
-  concrete need.
+- enable Remote Control
+- make sure the Mac stays awake
+- leave it connected to power
+- remember to undo everything after returning
 
-Automatic takeover of a conversation still owned by a live desktop Codex
-worker is blocked by the lack of a safe immediate per-thread release mechanism.
-The verified manual Mac → phone → Mac workflow and the upstream capability gap
-are documented in [Live desktop thread handoff](docs/live-thread-handoff.md).
+Codex Away removes that preparation:
 
-SSH fallback, tmux/session orchestration, trusted-network automation, and a
-dedicated remote-development server are outside this project's scope.
+```text
+Lock your Mac   = I might want it remotely.
+Unlock your Mac = I am back.
+```
 
-## What it is useful for
+That is the entire interaction model.
 
-Use this when you want to reach Codex running on your Mac from another authorized device, such as the ChatGPT iOS app, without leaving Remote Control enabled while you are actively using the Mac.
+## How it behaves
 
-It is particularly useful for a MacBook that acts as an occasional remote development machine while docked or charging.
+```text
+Working normally on Mac
+          │
+          ▼
+  Lock Mac on AC power
+          │
+          ▼
+     Codex Away
+          │
+          ├── Codex Remote on
+          ├── Mac kept awake
+          ├── services monitored
+          └── failures recovered
+          │
+          ▼
+Continue from phone while away
+          │
+          ▼
+       Unlock Mac
+          │
+          ▼
+Remote mode off; normal Mac again
+```
 
-Remote availability does not guarantee automatic takeover of a conversation
-that is still owned by a live desktop Codex worker. Release the terminal session
-with `Ctrl+C` before locking when you want to continue that conversation from
-the phone.
+If AC power is disconnected while the Mac is locked, Codex Away also turns
+Remote Control and its sleep-prevention assertion off. Reconnecting AC while
+the Mac remains locked makes the services available again.
 
-## Requirements
+## What Codex Away does
+
+- Starts Codex Remote automatically when the Mac is locked on AC power.
+- Keeps the Mac awake while remote mode is active.
+- Stops remote mode when the Mac is unlocked or AC power is disconnected.
+- Validates exact managed-process identity instead of trusting stale state.
+- Detects required-process exits and performs bounded recovery.
+- Uses exponential retry backoff to avoid restart storms.
+- Runs periodic health audits while remote mode is desired.
+- Reconstructs managed state after controller restarts.
+- Avoids stopping unrelated Codex processes.
+- Runs as a per-user, event-driven macOS LaunchAgent.
+- Requires no custom phone application, relay, or session interface.
+
+## Install
+
+### Requirements
 
 - macOS
 - Xcode or Xcode Command Line Tools, including `swiftc`
@@ -60,7 +94,7 @@ The standalone Codex executable must exist at:
 ~/.codex/packages/standalone/current/codex
 ```
 
-If needed, install it with:
+If needed, install Codex with the official installer:
 
 ```sh
 curl -fsSL https://chatgpt.com/codex/install.sh | sh
@@ -73,22 +107,28 @@ codex remote-control start
 codex remote-control stop
 ```
 
-## Install
+### Install the controller
 
-Clone the repository and run:
+Clone this repository and run:
 
 ```sh
 ./install.sh
 ```
 
-The installer compiles the Swift listener and installs:
+The installer compiles the listener, installs it for the current user, and
+starts its LaunchAgent automatically.
+
+> [!NOTE]
+> The product is now named Codex Away, but the executable, LaunchAgent, and
+> Application Support paths retain their original implementation names until
+> the separate migration is completed.
+
+Current installed paths:
 
 ```text
 ~/Library/Application Support/CodexRemoteOnLock/codex-remote-on-lock
 ~/Library/LaunchAgents/com.openai.codex.remote-on-lock.plist
 ```
-
-The LaunchAgent starts automatically for the current user at login.
 
 ## Verify operation
 
@@ -104,7 +144,8 @@ Follow its activity log:
 tail -f "$HOME/Library/Application Support/CodexRemoteOnLock/controller.log"
 ```
 
-While connected to AC power, lock and unlock the Mac. The log should show a sequence similar to:
+While connected to AC power, lock and unlock the Mac. The log should show a
+sequence similar to:
 
 ```text
 lock event received
@@ -115,49 +156,72 @@ remote control stopped
 caffeinate stopped
 ```
 
-You can inspect active power assertions with:
+Inspect active power assertions with:
 
 ```sh
 pmset -g assertions
 ```
 
-## Uninstall
+## Reliability
 
-Run:
+Codex Remote and `caffeinate -s` are managed through a shared service
+lifecycle. Codex Away:
 
-```sh
-./uninstall.sh
+- serializes reconciliation so the newest lock and power state wins
+- monitors exact validated service processes for exit
+- checks required services with bounded health audits
+- retries failures three times with exponential backoff
+- cancels monitoring and pending recovery immediately on unlock or AC loss
+- persists versioned ownership metadata
+- safely re-adopts its exact `caffeinate` process after a controller restart
+
+Its internal lifecycle is:
+
+```text
+OFF → STARTING → READY → RECOVERING
+                      └→ ERROR
 ```
 
-This unloads the LaunchAgent, stops Codex Remote Control, and removes the installed executable and plist. Logs and state are intentionally retained under `~/Library/Application Support/CodexRemoteOnLock` for troubleshooting.
+The primary locked + AC workflow passed automated and real-world acceptance
+testing. See [Reliability acceptance testing](docs/reliability-testing.md) for
+the results and [Observed state and ownership](docs/observed-state.md) for the
+process-safety model.
 
-## How it works
+## Known Codex limitation
 
-The listener subscribes to:
+### Active desktop conversations
 
-- macOS screen-lock and screen-unlock notifications
-- `NSWorkspace` session activation changes
-- IOKit's power-source change callback
+Codex Remote can expose desktop conversations to the phone, but a conversation
+still owned by a live desktop Codex worker may not be immediately resumable
+remotely.
 
-At startup it reads the current lock and AC-power state once, then waits for events. There is no periodic timer.
+If you intend to continue the same terminal conversation from your phone,
+release the terminal Codex session with `Ctrl+C` before locking the Mac. Codex
+Away does not kill arbitrary Codex workers to force a handoff.
 
-The listener tracks whether it enabled Codex Remote Control. It keeps the display free to turn off; `caffeinate -s` prevents system sleep only while running on AC power.
-
-## Security considerations
-
-- Codex Remote Control makes the Mac available to devices authorized through your Codex account. Review your authorized devices and account security before enabling it.
-- This project does not store Codex credentials, passwords, or API keys.
-- The automation runs only for the user who installs it.
-- Locking the screen does not replace full-disk encryption, a strong login password, or secure account configuration.
-- Codex currently labels `remote-control` experimental, so command behavior may change in future releases.
+This is a limitation of the current Codex worker/session lifecycle rather than
+the host-availability controller. The verified manual workflow and upstream
+capability gap are documented in
+[Live desktop thread handoff](docs/live-thread-handoff.md).
 
 ## Troubleshooting
 
-If the listener does not start, inspect:
+### The listener does not start
+
+Inspect the LaunchAgent error log:
 
 ```sh
 cat "$HOME/Library/Application Support/CodexRemoteOnLock/launchd-error.log"
 ```
+
+Reinstall after changing the source:
+
+```sh
+./install.sh
+```
+
+The installer rebuilds the listener, replaces the installed binary, and
+reloads the LaunchAgent.
 
 ### A live desktop conversation fails to load remotely
 
@@ -168,56 +232,79 @@ the controller log says Remote Control started successfully, inspect:
 tail "$HOME/.codex/app-server-daemon/app-server.stderr.log"
 ```
 
-An `already has an active writer` error means a live desktop Codex worker still
-owns that conversation. The Mac is reachable; only that thread's handoff is
-blocked. Start a new remote thread or let the desktop worker release the thread
-before locking. Do not kill arbitrary Codex processes. See
-[docs/live-thread-handoff.md](docs/live-thread-handoff.md).
+An `already has an active writer` error means the Mac is reachable but a live
+desktop worker still owns that conversation. Start a new remote thread or
+release the desktop session before locking. Do not kill arbitrary Codex
+processes.
 
 ### Remote commands hang in Desktop or Downloads threads
 
-macOS protects folders such as `Desktop` and `Downloads` with Files and
-Folders privacy controls. The first time the background Codex process resumes
-a thread whose working directory is one of these locations, macOS may request
-permission to access that folder.
+macOS protects folders such as `Desktop` and `Downloads` with Files and Folders
+privacy controls. A background Codex process may need permission before it can
+resume a thread whose working directory is in one of those locations.
 
-If the Mac is locked, the permission dialog is not visible on the remote
-device. The iOS app can still display and continue the thread, but even simple
-commands such as `pwd` or `date` may appear to hang. Interrupted commands can
-then report exit code `130`. This is separate from Codex command approval and
-does not indicate a problem with the file being accessed.
+If the Mac is locked, the permission dialog is not visible remotely. Unlock the
+Mac, approve the prompt, and verify the relevant access under **System Settings
+→ Privacy & Security → Files and Folders**. Lock the Mac again and retry with a
+fresh read-only command such as `pwd`.
 
-To fix it:
+Full Disk Access is broader than necessary and should not be granted unless the
+narrower Files and Folders permission proves insufficient.
 
-1. Unlock the Mac and approve the macOS prompts for Desktop and Downloads
-   access.
-2. Open **System Settings → Privacy & Security → Files and Folders** and verify
-   that the relevant folder access is enabled for Codex.
-3. Lock the Mac again. This LaunchAgent will restart Remote Control with the
-   newly granted permissions.
-4. Send a fresh read-only command, such as `pwd`, from an existing Desktop or
-   Downloads thread in the iOS app.
+## Uninstall
 
-Ordinary commands should then complete normally. A command that changes or
-deletes files may still require a separate Codex approval. Full Disk Access is
-broader than necessary and should not be granted unless Files and Folders
-permissions prove insufficient.
+Run:
 
-To reinstall after changing the source, run `./install.sh` again. It recompiles the listener, replaces the installed binary, and reloads the LaunchAgent.
+```sh
+./uninstall.sh
+```
+
+This unloads the LaunchAgent, stops controller-owned services, and removes the
+installed executable and plist. Logs and state remain under
+`~/Library/Application Support/CodexRemoteOnLock` for troubleshooting.
+
+## Technical architecture
+
+Codex Away deliberately does not build another Codex client, remote relay,
+approval interface, SSH manager, tmux layer, or permanent development server.
+OpenAI provides the remote experience; Codex Away manages whether the Mac is
+ready to host it.
+
+```text
+macOS lock + power events
+           │
+           ▼
+   machine state + policy
+           │
+           ▼
+ serialized reconciliation
+           │
+           ├── Codex Remote lifecycle
+           └── caffeinate lifecycle
+```
+
+The listener subscribes to macOS screen-lock, screen-unlock, session, and IOKit
+power-source events. It reads the current lock and AC state at startup, then
+waits for events rather than polling on a timer.
+
+External commands run asynchronously with bounded output, cancellation, exit
+status, and timeouts. Health checks keep observed process state separate from
+controller ownership and reject missing, stale, reused, or mismatched process
+identities.
 
 ## Development
 
-The project is organized as a Swift package:
+The project is a Swift package:
 
 ```text
 Sources/
 ├── RemoteDevCore/       State, policy, and policy evaluation
-├── RemoteDevServices/   Managed-service lifecycle and system boundaries
+├── RemoteDevServices/   Managed services and system boundaries
 └── RemoteDevDaemon/     macOS events and service control
 
 Tests/
-├── RemoteDevCoreTests/      Unit tests for core policy behavior
-└── RemoteDevServicesTests/  Service and reconciliation unit tests
+├── RemoteDevCoreTests/      Core policy tests
+└── RemoteDevServicesTests/  Service and reconciliation tests
 ```
 
 Run the test suite:
@@ -226,29 +313,29 @@ Run the test suite:
 swift test
 ```
 
-Build the release executable without installing or reloading the LaunchAgent:
+Build the release executable without installing it:
 
 ```sh
 swift build --configuration release --product codex-remote-on-lock
 ```
 
-The daemon currently runs with an automatic policy requiring both a locked
-screen and AC power. The core also defines force-on and force-off modes for a
-future CLI, but they are not exposed to users yet.
+Internal Swift target names remain unchanged for now. They do not block the
+public product identity.
 
-Codex Remote and `caffeinate` implement a common managed-service lifecycle.
-External commands run asynchronously with bounded output, cancellation, and
-timeouts. Reconciliation is serialized and coalesces pending machine-state
-changes so the newest lock and power policy wins.
-The coordinator also derives an internal `OFF`, `STARTING`, `READY`,
-`RECOVERING`, or `ERROR` lifecycle from desired policy and observed required
-service health, recording transition reasons and failures in the controller log.
-While remote mode remains desired, exact validated service PIDs are monitored
-for exit and checked by a bounded health audit. Required-service failures use
-three serialized recovery attempts with bounded exponential backoff; unlock or
-AC disconnection cancels all monitoring and pending recovery immediately.
-Health checks validate actual process identity and keep observed state separate
-from controller ownership. Legacy state is migrated to versioned ownership
-metadata, and controller-owned `caffeinate` can be safely re-adopted after a
-daemon restart. See [docs/observed-state.md](docs/observed-state.md) for the
-Codex runtime signals, ownership rules, and version assumptions.
+## Security
+
+- Codex Remote Control makes the Mac available only through devices authorized
+  by the user's Codex account.
+- Codex Away stores no Codex credentials, passwords, API keys, or private keys.
+- The automation runs only for the macOS user who installs it.
+- Exact identity and ownership checks prevent it from stopping unrelated Codex
+  processes.
+- Locking the screen does not replace FileVault, a strong login password, or
+  secure account configuration.
+- Codex currently labels `remote-control` experimental, so its behavior may
+  change in future releases.
+
+## Disclaimer
+
+Codex Away is an independent utility and is not affiliated with or endorsed by
+OpenAI.
