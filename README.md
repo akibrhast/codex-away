@@ -55,28 +55,15 @@ That is the entire interaction model.
 
 ## How it behaves
 
-```text
-Working normally on Mac
-          │
-          ▼
-  Lock Mac on AC power
-          │
-          ▼
-     Codex Away
-          │
-          ├── Codex Remote on
-          ├── Mac kept awake
-          ├── services monitored
-          └── failures recovered
-          │
-          ▼
-Continue from phone while away
-          │
-          ▼
-       Unlock Mac
-          │
-          ▼
-Remote mode off; normal Mac again
+```mermaid
+flowchart TD
+    A[Working normally on Mac] --> B[Plug in and lock]
+    B --> C[Codex Away activates]
+    C --> D[Remote Control on<br/>Mac awake and monitored]
+    D --> E[Continue from phone]
+    E --> F[Unlock Mac]
+    F --> G[Remote mode off<br/>Normal Mac again]
+    D -->|AC power disconnected| G
 ```
 
 If AC power is disconnected while the Mac is locked, Codex Away also turns
@@ -158,32 +145,8 @@ installed executable and plist. Logs and state remain under
 
 ## Technical architecture
 
-Codex Away deliberately does not build another Codex client, remote relay,
-approval interface, SSH manager, tmux layer, or permanent development server.
-OpenAI provides the remote experience; Codex Away manages whether the Mac is
-ready to host it.
-
-```text
-macOS lock + power events
-           │
-           ▼
-   machine state + policy
-           │
-           ▼
- serialized reconciliation
-           │
-           ├── Codex Remote lifecycle
-           └── caffeinate lifecycle
-```
-
-The listener subscribes to macOS screen-lock, screen-unlock, session, and IOKit
-power-source events. It reads the current lock and AC state at startup, then
-waits for events rather than polling on a timer.
-
-External commands run asynchronously with bounded output, cancellation, exit
-status, and timeouts. Health checks keep observed process state separate from
-controller ownership and reject missing, stale, reused, or mismatched process
-identities.
+See [Technical architecture](docs/architecture.md) for the event model,
+service lifecycle, and process-safety design.
 
 ## Development
 
