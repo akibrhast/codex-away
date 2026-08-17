@@ -91,6 +91,8 @@ the Mac remains locked makes the services available again.
 ### Requirements
 
 - macOS 13 or later on Apple Silicon or Intel
+- `caffeinate`, included with macOS at `/usr/bin/caffeinate`—there is nothing
+  extra to install
 - The standalone Codex installation managed by the official installer
 - Codex Remote Control configured and tested at least once
 
