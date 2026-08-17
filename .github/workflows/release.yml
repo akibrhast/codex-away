@@ -13,7 +13,7 @@ jobs:
     runs-on: macos-15
     environment: release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Verify tag and run tests
         run: |
