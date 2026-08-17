@@ -53,6 +53,7 @@ final class ReconciliationCoordinatorTests: XCTestCase {
         var logs: [String] = []
         let coordinator = ReconciliationCoordinator(
             reconciler: ServiceReconciler(services: [service]),
+            recoveryPolicy: RecoveryPolicy(maximumAttempts: 1),
             logger: { logs.append($0) }
         )
 
@@ -62,10 +63,9 @@ final class ReconciliationCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.lifecycle.phase, .error)
         XCTAssertEqual(coordinator.lifecycle.reason, "lock")
         XCTAssertNotNil(coordinator.lifecycle.failure)
-        XCTAssertEqual(logs.count, 2)
-        XCTAssertTrue(logs[0].contains("OFF → STARTING"))
-        XCTAssertTrue(logs[1].contains("STARTING → ERROR"))
-        XCTAssertTrue(logs[1].contains("failure:"))
+        XCTAssertTrue(logs.contains { $0.contains("OFF → STARTING") })
+        XCTAssertTrue(logs.contains { $0.contains("STARTING → ERROR") })
+        XCTAssertTrue(logs.contains { $0.contains("failure:") })
     }
 
     func testHealthyAuditRemainsReadyWithoutFalseRecoveryTransition() async {
@@ -73,6 +73,7 @@ final class ReconciliationCoordinatorTests: XCTestCase {
         var logs: [String] = []
         let coordinator = ReconciliationCoordinator(
             reconciler: ServiceReconciler(services: [service]),
+            recoveryPolicy: RecoveryPolicy(maximumAttempts: 1),
             logger: { logs.append($0) }
         )
 
@@ -85,7 +86,7 @@ final class ReconciliationCoordinatorTests: XCTestCase {
         XCTAssertFalse(logs.contains { $0.contains("RECOVERING") })
     }
 
-    func testFailedRecoveryTransitionsFromReadyThroughRecoveringToError() async {
+    func testFailedRecoveryTransitionsFromReadyToRecovering() async {
         let service = MockManagedService(id: "codex", health: .healthy)
         var logs: [String] = []
         let coordinator = ReconciliationCoordinator(
@@ -100,9 +101,8 @@ final class ReconciliationCoordinatorTests: XCTestCase {
         coordinator.submit(desiredRemoteState: true, reason: "health audit")
         await coordinator.waitUntilIdle()
 
-        XCTAssertEqual(coordinator.lifecycle.phase, .error)
+        XCTAssertEqual(coordinator.lifecycle.phase, .recovering)
         XCTAssertNotNil(coordinator.lifecycle.failure)
         XCTAssertTrue(logs.contains { $0.contains("READY → RECOVERING") })
-        XCTAssertTrue(logs.contains { $0.contains("RECOVERING → ERROR") })
     }
 }

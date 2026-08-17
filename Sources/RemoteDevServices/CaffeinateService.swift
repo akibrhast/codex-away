@@ -54,6 +54,18 @@ public final class CaffeinateService: ManagedService {
         return .unhealthy("controller-owned caffeinate process is not running")
     }
 
+    public func monitoringIdentity() -> ProcessIdentity? {
+        guard let record = ownershipStore.load(serviceID: id),
+              record.owned,
+              let identity = record.processIdentity,
+              processIdentityMatches(
+                  processInspector.inspect(processIdentifier: identity.processIdentifier),
+                  expected: identity
+              )
+        else { return nil }
+        return identity
+    }
+
     public func start(reason _: String) async throws {
         guard await inspect() != .healthy else { return }
 

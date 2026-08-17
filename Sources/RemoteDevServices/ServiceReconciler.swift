@@ -49,7 +49,8 @@ public final class ServiceReconciler {
                 ServiceObservation(
                     serviceID: service.id,
                     required: service.required,
-                    health: await service.inspect()
+                    health: await service.inspect(),
+                    processIdentity: service.monitoringIdentity()
                 )
             )
         }
@@ -128,6 +129,19 @@ public struct ServiceObservation: Equatable, Sendable {
     public let serviceID: String
     public let required: Bool
     public let health: ServiceHealth
+    public let processIdentity: ProcessIdentity?
+
+    public init(
+        serviceID: String,
+        required: Bool,
+        health: ServiceHealth,
+        processIdentity: ProcessIdentity? = nil
+    ) {
+        self.serviceID = serviceID
+        self.required = required
+        self.health = health
+        self.processIdentity = processIdentity
+    }
 }
 
 public struct ServiceOperationResult: Equatable, Sendable {

@@ -202,7 +202,7 @@ Commit: `d049cd1`
 Current test baseline:
 
 ```text
-66 tests passing
+73 tests passing
 ```
 
 These abstractions are retained because they directly support reliability.
@@ -1271,17 +1271,19 @@ Controller status accurately represents desired and observed reality.
 
 ---
 
-## Milestone 6 — Self-Healing Reconciliation
+## Milestone 6 — Self-Healing Reconciliation — COMPLETED
 
-- detect when Codex exits while remote mode remains desired
-- prefer an event-driven process-exit signal when reliable
-- use a bounded health audit only if Codex exposes no dependable event source
-- restart unhealthy required services
-- add retry limits and exponential backoff
-- reset recovery counters after stable health or policy change
-- avoid restart storms
-- log recovery attempts and outcomes
-- stop recovery immediately after unlock or AC disconnect
+- watches exact validated required-service PIDs with Darwin process-exit events
+- uses a bounded 30-second health audit as a monitoring safety net
+- restarts unhealthy required services through serialized reconciliation
+- limits recovery to three attempts with bounded exponential backoff
+- resets recovery counters after stable health or a policy cycle
+- coalesces duplicate exit and audit signals to avoid restart storms
+- records exit, retry, exhaustion, recovery, and stable-reset outcomes
+- cancels monitors, audits, backoff, and stale work immediately after unlock or
+  AC disconnect
+- verifies the real Darwin exit source plus deterministic retry, audit,
+  cancellation, stable-reset, and stale-event behavior in tests
 
 Success:
 

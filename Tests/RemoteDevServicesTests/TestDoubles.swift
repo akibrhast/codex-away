@@ -146,6 +146,7 @@ final class MockManagedService: ManagedService {
     var startError: Error?
     var stopError: Error?
     var startDelay: Duration?
+    var processIdentity: ProcessIdentity?
     private(set) var events: [String] = []
 
     init(id: String, required: Bool = true, health: ServiceHealth) {
@@ -158,6 +159,8 @@ final class MockManagedService: ManagedService {
         events.append("inspect")
         return health
     }
+
+    func monitoringIdentity() -> ProcessIdentity? { processIdentity }
 
     func start(reason: String) async throws {
         events.append("start:\(reason)")
@@ -176,5 +179,64 @@ final class MockManagedService: ManagedService {
             throw stopError
         }
         health = .stopped
+    }
+}
+
+final class MockProcessExitMonitor: ProcessExitMonitoring, @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuations: [Int32: AsyncStream<Void>.Continuation] = [:]
+
+    func events(for processIdentifier: Int32) -> AsyncStream<Void> {
+        AsyncStream { continuation in
+            lock.withLock { continuations[processIdentifier] = continuation }
+        }
+    }
+
+    func emit(processIdentifier: Int32) {
+        let continuation = lock.withLock { continuations[processIdentifier] }
+        continuation?.yield(())
+        continuation?.finish()
+    }
+}
+
+final class ControlledRecoverySleeper: RecoverySleeping, @unchecked Sendable {
+    private struct Waiter {
+        let interval: TimeInterval
+        let continuation: CheckedContinuation<Void, any Error>
+    }
+
+    private let lock = NSLock()
+    private var waiters: [UUID: Waiter] = [:]
+    private var recordedIntervals: [TimeInterval] = []
+
+    var intervals: [TimeInterval] {
+        lock.withLock { recordedIntervals }
+    }
+
+    func sleep(for interval: TimeInterval) async throws {
+        let id = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                lock.withLock {
+                    recordedIntervals.append(interval)
+                    waiters[id] = Waiter(interval: interval, continuation: continuation)
+                }
+            }
+        } onCancel: {
+            let waiter = lock.withLock { waiters.removeValue(forKey: id) }
+            waiter?.continuation.resume(throwing: CancellationError())
+        }
+    }
+
+    @discardableResult
+    func resumeFirst(interval: TimeInterval) -> Bool {
+        let waiter = lock.withLock { () -> Waiter? in
+            guard let entry = waiters.first(where: { $0.value.interval == interval }) else {
+                return nil
+            }
+            return waiters.removeValue(forKey: entry.key)
+        }
+        waiter?.continuation.resume()
+        return waiter != nil
     }
 }

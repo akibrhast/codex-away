@@ -43,6 +43,11 @@ public final class CodexRemoteService: ManagedService {
         }
     }
 
+    public func monitoringIdentity() -> ProcessIdentity? {
+        guard case let .running(identity) = runtimeInspector.inspect() else { return nil }
+        return identity
+    }
+
     public func start(reason: String) async throws {
         guard await inspect() != .healthy else { return }
 

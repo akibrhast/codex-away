@@ -219,6 +219,10 @@ changes so the newest lock and power policy wins.
 The coordinator also derives an internal `OFF`, `STARTING`, `READY`,
 `RECOVERING`, or `ERROR` lifecycle from desired policy and observed required
 service health, recording transition reasons and failures in the controller log.
+While remote mode remains desired, exact validated service PIDs are monitored
+for exit and checked by a bounded health audit. Required-service failures use
+three serialized recovery attempts with bounded exponential backoff; unlock or
+AC disconnection cancels all monitoring and pending recovery immediately.
 Health checks validate actual process identity and keep observed state separate
 from controller ownership. Legacy state is migrated to versioned ownership
 metadata, and controller-owned `caffeinate` can be safely re-adopted after a

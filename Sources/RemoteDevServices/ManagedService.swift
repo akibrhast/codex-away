@@ -8,8 +8,13 @@ public protocol ManagedService: AnyObject {
     var required: Bool { get }
 
     func inspect() async -> ServiceHealth
+    func monitoringIdentity() -> ProcessIdentity?
     func start(reason: String) async throws
     func stop(reason: String) async throws
+}
+
+public extension ManagedService {
+    func monitoringIdentity() -> ProcessIdentity? { nil }
 }
 
 public struct ServiceOperationError: Error, Equatable, CustomStringConvertible {
