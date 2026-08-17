@@ -165,10 +165,12 @@ The project is organized as a Swift package:
 ```text
 Sources/
 ├── RemoteDevCore/       State, policy, and policy evaluation
+├── RemoteDevServices/   Managed-service lifecycle and system boundaries
 └── RemoteDevDaemon/     macOS events and service control
 
 Tests/
-└── RemoteDevCoreTests/  Unit tests for core policy behavior
+├── RemoteDevCoreTests/      Unit tests for core policy behavior
+└── RemoteDevServicesTests/  Service and reconciliation unit tests
 ```
 
 Run the test suite:
@@ -186,3 +188,9 @@ swift build --configuration release --product codex-remote-on-lock
 The daemon currently runs with an automatic policy requiring both a locked
 screen and AC power. The core also defines force-on and force-off modes for a
 future CLI, but they are not exposed to users yet.
+
+Codex Remote and `caffeinate` implement a common managed-service lifecycle.
+Their current health checks cover controller-owned state only: the Codex
+service reads the existing state file, while the `caffeinate` service tracks
+the process it launched. System-wide process discovery and recovery after a
+daemon restart are planned for the observed-state milestone.

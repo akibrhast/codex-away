@@ -9,13 +9,18 @@ let package = Package(
     ],
     products: [
         .library(name: "RemoteDevCore", targets: ["RemoteDevCore"]),
+        .library(name: "RemoteDevServices", targets: ["RemoteDevServices"]),
         .executable(name: "codex-remote-on-lock", targets: ["RemoteDevDaemon"]),
     ],
     targets: [
         .target(name: "RemoteDevCore"),
+        .target(
+            name: "RemoteDevServices",
+            dependencies: ["RemoteDevCore"]
+        ),
         .executableTarget(
             name: "RemoteDevDaemon",
-            dependencies: ["RemoteDevCore"],
+            dependencies: ["RemoteDevCore", "RemoteDevServices"],
             linkerSettings: [
                 .linkedFramework("AppKit"),
                 .linkedFramework("IOKit"),
@@ -24,6 +29,10 @@ let package = Package(
         .testTarget(
             name: "RemoteDevCoreTests",
             dependencies: ["RemoteDevCore"]
+        ),
+        .testTarget(
+            name: "RemoteDevServicesTests",
+            dependencies: ["RemoteDevServices"]
         ),
     ]
 )
