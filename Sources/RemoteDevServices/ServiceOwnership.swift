@@ -97,6 +97,7 @@ public final class FileServiceOwnershipStore: ServiceOwnershipPersisting {
 @MainActor
 public protocol ProcessSignaling {
     func terminate(processIdentifier: Int32) -> Bool
+    func forceTerminate(processIdentifier: Int32) -> Bool
 }
 
 @MainActor
@@ -105,5 +106,9 @@ public struct DarwinProcessSignaler: ProcessSignaling {
 
     public func terminate(processIdentifier: Int32) -> Bool {
         Darwin.kill(processIdentifier, SIGTERM) == 0
+    }
+
+    public func forceTerminate(processIdentifier: Int32) -> Bool {
+        Darwin.kill(processIdentifier, SIGKILL) == 0
     }
 }

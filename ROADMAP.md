@@ -176,7 +176,7 @@ This behavior should remain the foundation.
 
 ## Implemented Architecture
 
-The repository has already completed two foundational milestones.
+The repository has already completed four foundational milestones.
 
 ### Milestone 1 — Core state and policy (completed)
 
@@ -202,7 +202,7 @@ Commit: `d049cd1`
 Current test baseline:
 
 ```text
-49 tests passing
+56 tests passing
 ```
 
 These abstractions are retained because they directly support reliability.
@@ -1166,14 +1166,18 @@ service is actually running without confusing unrelated processes for its own.
 
 ---
 
-## Milestone 4 — Async Commands and Timeouts — NEXT
+## Milestone 4 — Async Commands and Timeouts — COMPLETED
 
-- move external command execution away from the main event loop
-- use a serialized reconciliation actor/task
-- add timeout and cancellation support
-- capture exit status and bounded stdout/stderr
-- make newer machine-state events supersede stale work safely
-- ensure unlock and AC-disconnect events cannot be trapped behind a hung command
+- moved external command execution away from the main event loop
+- added a serialized, latest-state-wins reconciliation coordinator
+- added command timeout, cancellation, graceful termination, and forced cleanup
+- captures exit status and separately bounded stdout/stderr
+- made initial and delayed lock-state reads reject stale results by revision
+- made `ioreg`, Codex Remote commands, and caffeinate shutdown asynchronous
+- added command-runner and reconciliation race tests
+
+Retries, backoff, periodic monitoring, and automatic process-exit recovery remain
+outside this milestone.
 
 Success:
 

@@ -10,6 +10,7 @@ public final class CaffeinateService: ManagedService {
     private let processInspector: any ProcessInspecting
     private let processSignaler: any ProcessSignaling
     private let ownershipStore: any ServiceOwnershipPersisting
+    private let stopTimeout: TimeInterval
     private let logger: ServiceLogger
     private var process: (any LongRunningProcess)?
     private var lastFailure: String?
@@ -21,6 +22,7 @@ public final class CaffeinateService: ManagedService {
         processInspector: any ProcessInspecting,
         processSignaler: any ProcessSignaling,
         ownershipStore: any ServiceOwnershipPersisting,
+        stopTimeout: TimeInterval = 5,
         logger: @escaping ServiceLogger
     ) {
         self.executable = executable
@@ -29,10 +31,11 @@ public final class CaffeinateService: ManagedService {
         self.processInspector = processInspector
         self.processSignaler = processSignaler
         self.ownershipStore = ownershipStore
+        self.stopTimeout = stopTimeout
         self.logger = logger
     }
 
-    public func inspect() -> ServiceHealth {
+    public func inspect() async -> ServiceHealth {
         guard let record = ownershipStore.load(serviceID: id), record.owned else {
             if let lastFailure {
                 return .unhealthy(lastFailure)
@@ -51,8 +54,8 @@ public final class CaffeinateService: ManagedService {
         return .unhealthy("controller-owned caffeinate process is not running")
     }
 
-    public func start(reason _: String) throws {
-        guard inspect() != .healthy else { return }
+    public func start(reason _: String) async throws {
+        guard await inspect() != .healthy else { return }
 
         let newProcess = processFactory.makeProcess()
         do {
@@ -81,7 +84,7 @@ public final class CaffeinateService: ManagedService {
         }
     }
 
-    public func stop(reason _: String) throws {
+    public func stop(reason _: String) async throws {
         guard let record = ownershipStore.load(serviceID: id), record.owned else {
             process = nil
             lastFailure = nil
@@ -108,13 +111,35 @@ public final class CaffeinateService: ManagedService {
         if let process,
            process.processIdentifier == expectedIdentity.processIdentifier,
            process.isRunning {
-            process.terminateAndWait()
+            try await process.terminateAndWait(timeout: stopTimeout)
         } else if !processSignaler.terminate(processIdentifier: expectedIdentity.processIdentifier) {
             throw ServiceOperationError(
                 serviceID: id,
                 operation: .stop,
                 message: "could not terminate pid \(expectedIdentity.processIdentifier)"
             )
+        } else {
+            let deadline = Date().addingTimeInterval(stopTimeout)
+            while processIdentityMatches(
+                processInspector.inspect(processIdentifier: expectedIdentity.processIdentifier),
+                expected: expectedIdentity
+            ), Date() < deadline {
+                try await Task.sleep(for: .milliseconds(25))
+            }
+            if processIdentityMatches(
+                processInspector.inspect(processIdentifier: expectedIdentity.processIdentifier),
+                expected: expectedIdentity
+            ) {
+                guard processSignaler.forceTerminate(
+                    processIdentifier: expectedIdentity.processIdentifier
+                ) else {
+                    throw ServiceOperationError(
+                        serviceID: id,
+                        operation: .stop,
+                        message: "could not force terminate pid \(expectedIdentity.processIdentifier)"
+                    )
+                }
+            }
         }
         logger("caffeinate stopped (pid \(expectedIdentity.processIdentifier))")
         clearOwnership()

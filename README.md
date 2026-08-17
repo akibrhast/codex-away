@@ -213,6 +213,9 @@ screen and AC power. The core also defines force-on and force-off modes for a
 future CLI, but they are not exposed to users yet.
 
 Codex Remote and `caffeinate` implement a common managed-service lifecycle.
+External commands run asynchronously with bounded output, cancellation, and
+timeouts. Reconciliation is serialized and coalesces pending machine-state
+changes so the newest lock and power policy wins.
 Health checks validate actual process identity and keep observed state separate
 from controller ownership. Legacy state is migrated to versioned ownership
 metadata, and controller-owned `caffeinate` can be safely re-adopted after a

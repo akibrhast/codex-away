@@ -1,20 +1,20 @@
 import Foundation
 @testable import RemoteDevServices
 
-@MainActor
-final class MockCommandRunner: CommandRunning {
+final class MockCommandRunner: CommandRunning, @unchecked Sendable {
     struct Call: Equatable {
         let executable: String
         let arguments: [String]
-        let outputURL: URL?
+        let timeout: TimeInterval
     }
 
     var exitCodes: [Int32] = [0]
     private(set) var calls: [Call] = []
 
-    func run(executable: String, arguments: [String], outputURL: URL?) -> Int32 {
-        calls.append(Call(executable: executable, arguments: arguments, outputURL: outputURL))
-        return exitCodes.isEmpty ? 0 : exitCodes.removeFirst()
+    func run(executable: String, arguments: [String], timeout: TimeInterval) async throws -> CommandResult {
+        calls.append(Call(executable: executable, arguments: arguments, timeout: timeout))
+        let status = exitCodes.isEmpty ? 0 : exitCodes.removeFirst()
+        return CommandResult(exitStatus: status, stdout: "", stderr: "", stdoutTruncated: false, stderrTruncated: false, duration: 0)
     }
 }
 
@@ -74,11 +74,18 @@ final class MockCodexRuntimeInspector: CodexRuntimeInspecting {
 @MainActor
 final class MockProcessSignaler: ProcessSignaling {
     var result = true
+    var forceResult = true
     private(set) var terminatedPIDs: [Int32] = []
+    private(set) var forceTerminatedPIDs: [Int32] = []
 
     func terminate(processIdentifier: Int32) -> Bool {
         terminatedPIDs.append(processIdentifier)
         return result
+    }
+
+    func forceTerminate(processIdentifier: Int32) -> Bool {
+        forceTerminatedPIDs.append(processIdentifier)
+        return forceResult
     }
 }
 
@@ -109,7 +116,7 @@ final class MockLongRunningProcess: LongRunningProcess {
         return identity
     }
 
-    func terminateAndWait() {
+    func terminateAndWait(timeout: TimeInterval) async throws {
         terminateCount += 1
         isRunning = false
     }
@@ -138,6 +145,7 @@ final class MockManagedService: ManagedService {
     var health: ServiceHealth
     var startError: Error?
     var stopError: Error?
+    var startDelay: Duration?
     private(set) var events: [String] = []
 
     init(id: String, required: Bool = true, health: ServiceHealth) {
@@ -146,20 +154,23 @@ final class MockManagedService: ManagedService {
         self.health = health
     }
 
-    func inspect() -> ServiceHealth {
+    func inspect() async -> ServiceHealth {
         events.append("inspect")
         return health
     }
 
-    func start(reason: String) throws {
+    func start(reason: String) async throws {
         events.append("start:\(reason)")
+        if let startDelay {
+            try await Task.sleep(for: startDelay)
+        }
         if let startError {
             throw startError
         }
         health = .healthy
     }
 
-    func stop(reason: String) throws {
+    func stop(reason: String) async throws {
         events.append("stop:\(reason)")
         if let stopError {
             throw stopError

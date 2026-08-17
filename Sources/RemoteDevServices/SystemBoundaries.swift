@@ -1,42 +1,5 @@
+import Darwin
 import Foundation
-
-@MainActor
-public protocol CommandRunning {
-    func run(executable: String, arguments: [String], outputURL: URL?) -> Int32
-}
-
-@MainActor
-public final class ProcessCommandRunner: CommandRunning {
-    private let logger: ServiceLogger
-
-    public init(logger: @escaping ServiceLogger) {
-        self.logger = logger
-    }
-
-    public func run(executable: String, arguments: [String], outputURL: URL?) -> Int32 {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-
-        if let outputURL, let handle = try? FileHandle(forWritingTo: outputURL) {
-            _ = try? handle.seekToEnd()
-            process.standardOutput = handle
-            process.standardError = handle
-        } else {
-            process.standardOutput = FileHandle.nullDevice
-            process.standardError = FileHandle.nullDevice
-        }
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            return process.terminationStatus
-        } catch {
-            logger("failed to run \(executable): \(error)")
-            return 127
-        }
-    }
-}
 
 @MainActor
 public protocol LongRunningProcess: AnyObject {
@@ -44,7 +7,7 @@ public protocol LongRunningProcess: AnyObject {
     var processIdentifier: Int32 { get }
 
     func start(executable: String, arguments: [String]) throws -> ProcessIdentity
-    func terminateAndWait()
+    func terminateAndWait(timeout: TimeInterval) async throws
 }
 
 @MainActor
@@ -81,9 +44,26 @@ public final class FoundationLongRunningProcess: LongRunningProcess {
         return identity
     }
 
-    public func terminateAndWait() {
+    public func terminateAndWait(timeout: TimeInterval) async throws {
         process.terminate()
-        process.waitUntilExit()
+        let deadline = Date().addingTimeInterval(timeout)
+        while process.isRunning, Date() < deadline {
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        if process.isRunning {
+            Darwin.kill(process.processIdentifier, SIGKILL)
+            let killDeadline = Date().addingTimeInterval(1)
+            while process.isRunning, Date() < killDeadline {
+                try await Task.sleep(for: .milliseconds(25))
+            }
+        }
+        guard !process.isRunning else {
+            throw ServiceOperationError(
+                serviceID: "process",
+                operation: .stop,
+                message: "process did not exit"
+            )
+        }
     }
 }
 

@@ -7,9 +7,9 @@ public protocol ManagedService: AnyObject {
     var id: String { get }
     var required: Bool { get }
 
-    func inspect() -> ServiceHealth
-    func start(reason: String) throws
-    func stop(reason: String) throws
+    func inspect() async -> ServiceHealth
+    func start(reason: String) async throws
+    func stop(reason: String) async throws
 }
 
 public struct ServiceOperationError: Error, Equatable, CustomStringConvertible {

@@ -5,15 +5,14 @@ import XCTest
 @MainActor
 final class CodexRemoteServiceTests: XCTestCase {
     private let executable = "/test/codex"
-    private let outputURL = URL(fileURLWithPath: "/test/controller.log")
-
-    func testStoppedUnownedRuntimeIsStopped() {
+    func testStoppedUnownedRuntimeIsStopped() async {
         let service = makeService(runtime: MockCodexRuntimeInspector([.stopped]))
 
-        XCTAssertEqual(service.inspect(), .stopped)
+        let health = await service.inspect()
+        XCTAssertEqual(health, .stopped)
     }
 
-    func testStoppedOwnedRuntimeIsUnhealthy() {
+    func testStoppedOwnedRuntimeIsUnhealthy() async {
         let ownership = MockOwnershipStore()
         ownership.records["codex-remote"] = ownedRecord(identity: nil)
         let service = makeService(
@@ -21,26 +20,28 @@ final class CodexRemoteServiceTests: XCTestCase {
             ownership: ownership
         )
 
+        let health = await service.inspect()
         XCTAssertEqual(
-            service.inspect(),
+            health,
             .unhealthy("controller-owned Codex Remote is not running")
         )
     }
 
-    func testRunningUnownedRuntimeIsHealthyAndSkipsStart() throws {
+    func testRunningUnownedRuntimeIsHealthyAndSkipsStart() async throws {
         let runner = MockCommandRunner()
         let service = makeService(
             runner: runner,
             runtime: MockCodexRuntimeInspector([.running(makeCodexIdentity())])
         )
 
-        XCTAssertEqual(service.inspect(), .healthy)
-        try service.start(reason: "duplicate")
+        let health = await service.inspect()
+        XCTAssertEqual(health, .healthy)
+        try await service.start(reason: "duplicate")
 
         XCTAssertTrue(runner.calls.isEmpty)
     }
 
-    func testSuccessfulStartVerifiesRuntimeAndRecordsOwnership() throws {
+    func testSuccessfulStartVerifiesRuntimeAndRecordsOwnership() async throws {
         let runner = MockCommandRunner()
         let identity = makeCodexIdentity()
         let ownership = MockOwnershipStore()
@@ -53,20 +54,20 @@ final class CodexRemoteServiceTests: XCTestCase {
             logger: { logs.append($0) }
         )
 
-        try service.start(reason: "screen lock")
+        try await service.start(reason: "screen lock")
 
         XCTAssertEqual(runner.calls, [
             .init(
                 executable: executable,
                 arguments: ["remote-control", "start"],
-                outputURL: outputURL
+                timeout: 10
             ),
         ])
         XCTAssertEqual(ownership.records["codex-remote"], ownedRecord(identity: identity))
         XCTAssertEqual(logs, ["remote control started; trigger: screen lock"])
     }
 
-    func testFailedStartDoesNotRecordOwnership() {
+    func testFailedStartRecordsConservativeOwnershipForLaterCleanup() async {
         let runner = MockCommandRunner()
         runner.exitCodes = [9]
         let ownership = MockOwnershipStore()
@@ -76,22 +77,22 @@ final class CodexRemoteServiceTests: XCTestCase {
             ownership: ownership
         )
 
-        XCTAssertThrowsError(try service.start(reason: "test"))
-        XCTAssertNil(ownership.records["codex-remote"])
+        do { try await service.start(reason: "test"); XCTFail("expected start failure") } catch {}
+        XCTAssertEqual(ownership.records["codex-remote"], ownedRecord(identity: nil))
     }
 
-    func testSuccessfulCommandWithoutObservedRuntimeIsNotHealthy() {
+    func testSuccessfulCommandWithoutObservedRuntimeIsNotHealthy() async {
         let ownership = MockOwnershipStore()
         let service = makeService(
             runtime: MockCodexRuntimeInspector([.stopped, .stopped]),
             ownership: ownership
         )
 
-        XCTAssertThrowsError(try service.start(reason: "test"))
+        do { try await service.start(reason: "test"); XCTFail("expected verification failure") } catch {}
         XCTAssertEqual(ownership.records["codex-remote"], ownedRecord(identity: nil))
     }
 
-    func testOwnedRunningRuntimeStopsAndClearsOwnership() throws {
+    func testOwnedRunningRuntimeStopsAndClearsOwnership() async throws {
         let runner = MockCommandRunner()
         let identity = makeCodexIdentity()
         let ownership = MockOwnershipStore()
@@ -102,7 +103,7 @@ final class CodexRemoteServiceTests: XCTestCase {
             ownership: ownership
         )
 
-        try service.stop(reason: "unlock")
+        try await service.stop(reason: "unlock")
 
         XCTAssertEqual(runner.calls.first?.arguments, ["remote-control", "stop"])
         XCTAssertEqual(
@@ -111,19 +112,19 @@ final class CodexRemoteServiceTests: XCTestCase {
         )
     }
 
-    func testUnownedRunningRuntimeIsNeverStopped() throws {
+    func testUnownedRunningRuntimeIsNeverStopped() async throws {
         let runner = MockCommandRunner()
         let service = makeService(
             runner: runner,
             runtime: MockCodexRuntimeInspector([.running(makeCodexIdentity())])
         )
 
-        try service.stop(reason: "unlock")
+        try await service.stop(reason: "unlock")
 
         XCTAssertTrue(runner.calls.isEmpty)
     }
 
-    func testReplacedOwnedDaemonIsNeverStopped() throws {
+    func testReplacedOwnedDaemonIsNeverStopped() async throws {
         let runner = MockCommandRunner()
         let ownership = MockOwnershipStore()
         ownership.records["codex-remote"] = ownedRecord(identity: makeCodexIdentity())
@@ -138,13 +139,13 @@ final class CodexRemoteServiceTests: XCTestCase {
             ownership: ownership
         )
 
-        try service.stop(reason: "unlock")
+        try await service.stop(reason: "unlock")
 
         XCTAssertTrue(runner.calls.isEmpty)
         XCTAssertFalse(ownership.records["codex-remote"]?.owned ?? true)
     }
 
-    func testInvalidRuntimeRefusesOwnedStop() {
+    func testInvalidRuntimeRefusesOwnedStop() async {
         let runner = MockCommandRunner()
         let ownership = MockOwnershipStore()
         ownership.records["codex-remote"] = ownedRecord(identity: makeCodexIdentity())
@@ -154,7 +155,7 @@ final class CodexRemoteServiceTests: XCTestCase {
             ownership: ownership
         )
 
-        XCTAssertThrowsError(try service.stop(reason: "unlock"))
+        do { try await service.stop(reason: "unlock"); XCTFail("expected stop failure") } catch {}
         XCTAssertTrue(runner.calls.isEmpty)
         XCTAssertTrue(ownership.records["codex-remote"]?.owned == true)
     }
@@ -167,7 +168,6 @@ final class CodexRemoteServiceTests: XCTestCase {
     ) -> CodexRemoteService {
         CodexRemoteService(
             executable: executable,
-            outputURL: outputURL,
             commandRunner: runner,
             runtimeInspector: runtime,
             ownershipStore: ownership,

@@ -6,22 +6,22 @@ public final class ServiceReconciler {
         self.services = services
     }
 
-    public func reconcile(desiredRemoteState: Bool, reason: String) {
+    public func reconcile(desiredRemoteState: Bool, reason: String) async {
         if desiredRemoteState {
-            startServices(reason: reason)
+            await startServices(reason: reason)
         } else {
-            stopServices(reason: reason)
+            await stopServices(reason: reason)
         }
     }
 
-    private func startServices(reason: String) {
+    private func startServices(reason: String) async {
         for service in services {
-            switch service.inspect() {
+            switch await service.inspect() {
             case .healthy, .starting:
                 continue
             case .stopped, .unhealthy:
                 do {
-                    try service.start(reason: reason)
+                    try await service.start(reason: reason)
                 } catch {
                     if service.required {
                         return
@@ -31,13 +31,13 @@ public final class ServiceReconciler {
         }
     }
 
-    private func stopServices(reason: String) {
+    private func stopServices(reason: String) async {
         for service in services {
-            switch service.inspect() {
+            switch await service.inspect() {
             case .stopped:
                 continue
             case .starting, .healthy, .unhealthy:
-                try? service.stop(reason: reason)
+                try? await service.stop(reason: reason)
             }
         }
     }

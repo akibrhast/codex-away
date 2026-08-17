@@ -10,11 +10,13 @@ final class Controller {
     private let mode = ControllerMode.automatic
     private let policy = RemoteDevPolicy()
     private var machineState: MachineState
+    private var stateRevision: UInt64 = 0
 
     private var codex: String { homeDirectory.appendingPathComponent(".codex/packages/standalone/current/codex").path }
     private var stateDirectory: URL { homeDirectory.appendingPathComponent("Library/Application Support/CodexRemoteOnLock") }
     private var logFile: URL { stateDirectory.appendingPathComponent("controller.log") }
-    private lazy var serviceReconciler: ServiceReconciler = {
+    private let commandRunner: any CommandRunning = ProcessCommandRunner()
+    private lazy var reconciliationCoordinator: ReconciliationCoordinator = {
         let serviceLogger: ServiceLogger = { [weak self] message in
             self?.log(message)
         }
@@ -23,11 +25,9 @@ final class Controller {
             fileURL: stateDirectory.appendingPathComponent("service-ownership.json"),
             legacyCodexStateURL: stateDirectory.appendingPathComponent("state")
         )
-        let commandRunner = ProcessCommandRunner(logger: serviceLogger)
         let codexDaemonDirectory = homeDirectory.appendingPathComponent(".codex/app-server-daemon")
         let codexRemote = CodexRemoteService(
             executable: codex,
-            outputURL: logFile,
             commandRunner: commandRunner,
             runtimeInspector: FileCodexRuntimeInspector(
                 pidURL: codexDaemonDirectory.appendingPathComponent("app-server.pid"),
@@ -44,12 +44,14 @@ final class Controller {
             ownershipStore: ownershipStore,
             logger: serviceLogger
         )
-        return ServiceReconciler(services: [codexRemote, caffeinate])
+        return ReconciliationCoordinator(
+            reconciler: ServiceReconciler(services: [codexRemote, caffeinate])
+        )
     }()
 
     init() {
         machineState = MachineState(
-            isLocked: Self.readInitialLockState(),
+            isLocked: false,
             isOnACPower: Self.isOnACPower()
         )
         try? FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true)
@@ -96,23 +98,29 @@ final class Controller {
             }
         }
 
-        log("event listener active; initial lock state: \(machineState.isLocked); AC power: \(machineState.isOnACPower)")
-        reconcile(reason: "listener started")
+        log("event listener active; reading initial lock state asynchronously; AC power: \(machineState.isOnACPower)")
+        let revision = stateRevision
+        Task { [weak self] in
+            await self?.finishInitialStateRead(expectedRevision: revision)
+        }
     }
 
     func powerSourceChanged() {
+        stateRevision &+= 1
         machineState.isOnACPower = Self.isOnACPower()
         log("power-source event; AC power: \(machineState.isOnACPower)")
         reconcile(reason: "power source changed")
     }
 
     private func handleLockedEvent(source: String) {
+        stateRevision &+= 1
         machineState.isLocked = true
         log("lock event received from \(source)")
         reconcile(reason: source)
     }
 
     private func handleUnlockedEvent(source: String) {
+        stateRevision &+= 1
         machineState.isLocked = false
         log("unlock event received from \(source)")
         reconcile(reason: source)
@@ -120,13 +128,10 @@ final class Controller {
 
     private func handleSessionResigned() {
         log("session-resigned event received; waiting for lock-state update")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            guard let self else { return }
-            let isLocked = Self.readInitialLockState()
-            self.log("session-resigned verification; IOConsoleLocked: \(isLocked)")
-            if isLocked {
-                self.handleLockedEvent(source: "verified session-resigned notification")
-            }
+        let revision = stateRevision
+        Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(500))
+            await self?.verifySessionResigned(expectedRevision: revision)
         }
     }
 
@@ -136,7 +141,57 @@ final class Controller {
             machine: machineState,
             policy: policy
         )
-        serviceReconciler.reconcile(desiredRemoteState: desiredRemoteState, reason: reason)
+        reconciliationCoordinator.submit(
+            desiredRemoteState: desiredRemoteState,
+            reason: reason
+        )
+    }
+
+    private func finishInitialStateRead(expectedRevision: UInt64) async {
+        guard let isLocked = await readLockState() else {
+            guard expectedRevision == stateRevision else { return }
+            log("initial lock-state query failed; defaulting to unlocked")
+            reconcile(reason: "listener started with unknown lock state")
+            return
+        }
+        guard expectedRevision == stateRevision else {
+            log("initial lock-state result ignored because a newer event arrived")
+            return
+        }
+        machineState.isLocked = isLocked
+        log("initial lock state: \(isLocked); AC power: \(machineState.isOnACPower)")
+        reconcile(reason: "listener started")
+    }
+
+    private func verifySessionResigned(expectedRevision: UInt64) async {
+        guard expectedRevision == stateRevision else { return }
+        guard let isLocked = await readLockState() else {
+            log("session-resigned lock-state verification failed")
+            return
+        }
+        guard expectedRevision == stateRevision else {
+            log("session-resigned lock-state result ignored because a newer event arrived")
+            return
+        }
+        log("session-resigned verification; IOConsoleLocked: \(isLocked)")
+        if isLocked {
+            handleLockedEvent(source: "verified session-resigned notification")
+        }
+    }
+
+    private func readLockState() async -> Bool? {
+        do {
+            let result = try await commandRunner.run(
+                executable: "/usr/sbin/ioreg",
+                arguments: ["-n", "Root", "-d", "1"],
+                timeout: 5
+            )
+            guard result.exitStatus == 0 else { return nil }
+            return result.stdout.contains("\"IOConsoleLocked\" = Yes")
+        } catch {
+            log("lock-state command failed: \(error)")
+            return nil
+        }
     }
 
     private func log(_ message: String) {
@@ -161,23 +216,6 @@ final class Controller {
         return source as String == kIOPSACPowerValue as String
     }
 
-    private static func readInitialLockState() -> Bool {
-        let process = Process()
-        let pipe = Pipe()
-        process.executableURL = URL(fileURLWithPath: "/usr/sbin/ioreg")
-        process.arguments = ["-n", "Root", "-d", "1"]
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            let output = String(decoding: data, as: UTF8.self)
-            return output.contains("\"IOConsoleLocked\" = Yes")
-        } catch {
-            return false
-        }
-    }
 }
 
 let controller = Controller()
