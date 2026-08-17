@@ -57,7 +57,9 @@ if [[ ! -x "$codex_bin" ]]; then
 fi
 
 codesign --verify --strict --verbose=2 "$release_binary"
-if [[ "${CODEX_AWAY_ALLOW_ADHOC:-0}" != 1 ]] && ! codesign --display --verbose=2 "$release_binary" 2>&1 | grep -q '^Authority=Developer ID Application:'; then
+developer_id_requirement='anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] exists'
+if [[ "${CODEX_AWAY_ALLOW_ADHOC:-0}" != 1 ]] && \
+  ! codesign --verify --strict --test-requirement="=$developer_id_requirement" "$release_binary"; then
   print -u2 "Release binary is not signed with a Developer ID Application certificate."
   exit 1
 fi
