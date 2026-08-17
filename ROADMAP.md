@@ -19,7 +19,7 @@ Mac stays awake
         ↓
 Open ChatGPT/Codex on iPhone
         ↓
-Continue a desktop conversation that is not held by a live writer
+Safely transfer and continue the same desktop conversation
         ↓
 Return home and unlock Mac
         ↓
@@ -176,7 +176,7 @@ This behavior should remain the foundation.
 
 ## Implemented Architecture
 
-The repository has already completed four foundational milestones.
+The repository has already completed six foundational milestones.
 
 ### Milestone 1 — Core state and policy (completed)
 
@@ -374,7 +374,7 @@ same time.
 
 ---
 
-## Priority 3A — Investigate Safe Live-Thread Handoff
+## Priority 4 — Make Live Desktop Threads Safely Transferable
 
 Observed failure:
 
@@ -387,7 +387,9 @@ iOS cannot load that thread
 thread-store conflict: already has an active writer
 ```
 
-Investigate whether Codex exposes authoritative interfaces to:
+This is a primary product requirement, not an optional side investigation.
+The next milestone must determine whether Codex exposes authoritative
+interfaces to:
 
 1. map a live writer to its exact conversation
 2. distinguish an executing/waiting turn from a genuinely idle worker
@@ -409,7 +411,7 @@ automate worker shutdown.
 
 ---
 
-## Priority 4 — Self-Heal Codex Remote While the User Is Away
+## Priority 5 — Self-Heal Codex Remote While the User Is Away
 
 This is one of the highest-value improvements.
 
@@ -624,31 +626,9 @@ reconcile
 verify READY
 ```
 
-The goal includes recovery from ordinary network interruptions and explicitly
-tracks captive-portal sessions as a separate failure mode.
-
-### Captive-portal idle-session edge case
-
-Real scenario: the Mac is left locked at a dedicated library seat on a guest
-network such as UVA Guest while the user leaves for several hours. The guest
-portal may expire or sign out an idle session before the user attempts to
-connect from a phone. The Mac can remain associated with Wi-Fi while no longer
-having usable internet access, making Remote Control unreachable.
-
-Milestone 8 must not equate Wi-Fi association with network availability. It
-must investigate and distinguish:
-
-- Wi-Fi disconnected
-- Wi-Fi associated with working internet access
-- Wi-Fi associated but blocked by a captive portal or expired guest session
-- connectivity restored without user interaction
-- connectivity requiring interactive portal reauthentication
-
-The design should determine whether a policy-compliant, low-frequency activity
-check can prevent an idle portal session from expiring. It must not assume that
-automated portal reauthentication is possible or appropriate. If human portal
-interaction is required after expiry, the controller must report that as an
-unrecoverable remote-access condition rather than repeatedly restarting Codex.
+The goal is recovery from ordinary network interruptions. Captive-portal
+retention and guest-session reauthentication are deferred outside the main
+workflow.
 
 ### Not currently needed
 
@@ -1104,6 +1084,33 @@ DEFERRED, NOT CANCELLED
 
 ---
 
+## DEFERRED — Captive-Portal Session Retention
+
+The UVA Guest library scenario is real but location-specific: a locked Mac may
+remain associated with Wi-Fi after an idle guest session expires, leaving no
+usable internet path for Remote Control.
+
+Potential later work includes:
+
+- distinguish Wi-Fi association from usable internet connectivity
+- detect an expired or captive-portal-blocked guest session
+- investigate policy-compliant, low-frequency activity that may prevent idle
+  expiry
+- report when interactive local reauthentication is unavoidable
+- avoid Codex restart loops when the network, rather than Codex, is blocked
+
+Do not automate portal credentials or bypass network access policies. This work
+is explicitly outside the main milestone sequence until the core workflow and
+live-thread handoff are reliable.
+
+Status:
+
+```text
+DEFERRED, NOT CANCELLED
+```
+
+---
+
 # 15. Authoritative Milestone Order
 
 Every milestone follows the same delivery gate:
@@ -1212,33 +1219,6 @@ startup work cannot leave remote mode enabled after policy becomes false.
 
 ---
 
-## Investigation — Idle-Worker Release for Live Handoff
-
-This is a gated discovery task, not yet an implementation milestone.
-
-- reproduce the active-writer conflict with controlled desktop thread states
-- determine whether Codex exposes authoritative per-thread turn/worker state
-- determine whether Codex exposes a supported graceful writer-release action
-- distinguish idle from running, queued, approval-waiting, tool-waiting,
-  subtask-waiting, and unknown states
-- verify that releasing one idle writer does not affect other Codex sessions
-- verify that the same thread becomes loadable through Remote Control
-- stop the investigation without automation if safe state or release controls
-  are unavailable
-
-Only after the discovery evidence and design receive user confirmation should
-this become an implementation milestone.
-
-Success threshold:
-
-```text
-An exact, verifiably idle desktop thread writer can be released gracefully and
-the same conversation can then be resumed remotely, without interrupting any
-active or uncertain worker.
-```
-
----
-
 ## Milestone 5 — Remote Lifecycle State — COMPLETED
 
 Implement and derive:
@@ -1294,7 +1274,53 @@ READY to RECOVERING and back to READY without user intervention.
 
 ---
 
-## Milestone 7 — Sleep / Wake Recovery
+## Milestone 7 — Safe Live-Thread Handoff — NEXT
+
+This primary milestone has two mandatory gates.
+
+### Phase A — Authoritative capability discovery
+
+- reproduce the active-writer conflict with controlled desktop thread states
+- map a live writer to its exact conversation without broad process matching
+- determine whether Codex exposes authoritative per-thread turn and worker
+  state
+- distinguish genuinely idle from running, queued, approval-waiting,
+  tool-waiting, subtask-waiting, and unknown states
+- determine whether Codex exposes a supported graceful writer-release action
+- verify that a released idle thread becomes loadable through Remote Control
+- verify that no other Codex conversation or process is affected
+
+### Phase B — Supported implementation
+
+Proceed only if Phase A identifies both authoritative idle-state evidence and a
+graceful release mechanism.
+
+- evaluate handoff readiness when lock activates remote mode
+- release only the exact, authoritatively idle desktop writer
+- preserve any running, waiting, queued, approval-blocked, or unknown worker
+- verify the same conversation is resumable from the phone
+- record why a thread was transferred, preserved, or could not be classified
+- add fixture, state-table, stale-identity, and multi-session isolation tests
+
+Safety rule:
+
+> Preserve the worker unless both its identity and idle state are authoritative.
+
+If Codex exposes no safe mechanism, complete Phase A with a precise upstream
+capability gap and do not substitute elapsed-time guesses, quiet-output
+heuristics, signals, or forced termination.
+
+Success:
+
+```text
+An exact, verifiably idle desktop thread writer is released gracefully and the
+same conversation resumes remotely, without interrupting active or uncertain
+work.
+```
+
+---
+
+## Milestone 8 — Sleep / Wake Recovery
 
 - subscribe to relevant macOS sleep/wake events
 - invalidate stale runtime assumptions before sleep
@@ -1311,18 +1337,11 @@ user returns.
 
 ---
 
-## Milestone 8 — Network Recovery
+## Milestone 9 — Network Recovery
 
 - add network availability to `MachineState`
 - detect connectivity loss and restoration
 - trigger inspection and reconciliation when connectivity returns
-- detect usable internet connectivity rather than relying only on Wi-Fi link
-  state
-- distinguish captive-portal or expired-session failures from ordinary network
-  loss
-- investigate policy-compliant idle-session prevention for guest networks,
-  including the UVA Guest library scenario
-- avoid restart loops when portal reauthentication requires local interaction
 - avoid SSID allowlists, location policy, or VPN orchestration
 - determine through testing whether network loss should mean ERROR or a
   distinct non-ready condition
@@ -1330,13 +1349,12 @@ user returns.
 Success:
 
 ```text
-Ordinary network interruptions recover without user intervention, while an
-expired captive-portal session is detected and handled without a restart storm.
+Ordinary network interruptions recover without user intervention.
 ```
 
 ---
 
-## Milestone 9 — Reliability Testing
+## Milestone 10 — Reliability Testing
 
 Run deliberate failure tests.
 
@@ -1396,6 +1414,15 @@ restart controller daemon
 verify observed state reconstruction
 ```
 
+### Test G
+
+```text
+lock Mac with an exact, authoritatively idle desktop thread
+verify its writer is released gracefully
+resume the same conversation from the phone
+verify active and uncertain desktop workers remain untouched
+```
+
 Also verify:
 
 - the controller never stops unrelated Codex processes
@@ -1434,8 +1461,7 @@ The project is successful when the following behavior becomes boring and trustwo
 
 7. See desktop Codex conversations.
 
-8. Continue the conversation that was already in progress, provided its live
-   desktop writer has been safely released; otherwise use a new remote thread.
+8. Safely continue the same conversation that was already in progress.
 
 9. Return home.
 
