@@ -23,6 +23,22 @@ iPhone without carrying a MacBook everywhere “just in case.”
 > Leave your Mac behind without losing the ability to continue working from
 > your phone.
 
+## Support Codex Away
+
+If Codex Away makes it easier to leave your Mac behind and keep coding,
+optional support helps fund continued development.
+
+<p align="center">
+  <a href="https://buymeacoffee.com/akibrhast">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png"
+         alt="Buy me a coffee and support Codex Away"
+         height="50">
+  </a>
+</p>
+
+Buy Me a Coffee accepts major credit cards, Apple Pay, and Google Pay. Support
+does not affect access to the project or its features.
+
 ## Why this exists
 
 Codex Remote already provides conversations, approvals, authentication, and a
@@ -326,15 +342,6 @@ swift build --configuration release --product codex-away
 
 Internal Swift target names remain unchanged. They do not affect the public
 product identity.
-
-## Support Codex Away
-
-If Codex Away makes it easier to leave your Mac behind and keep coding, you can
-[buy me a coffee](https://buymeacoffee.com/akibrhast). Buy Me a Coffee supports
-one-time contributions using major credit cards, Apple Pay, and Google Pay.
-
-Support is entirely optional and does not affect access to the project or its
-features.
 
 ## Security
 
