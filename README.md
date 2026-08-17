@@ -29,18 +29,10 @@ iPhone without carrying a MacBook everywhere “just in case.”
 curl -fsSL https://raw.githubusercontent.com/akibrhast/codex-away/main/install.sh | sh
 ```
 
-That installs the latest signed universal release, verifies its checksum and
-Developer ID signature, and starts Codex Away automatically. It works on Apple
-Silicon and Intel Macs running macOS 13 or later.
+**Requires:** macOS 13+ and the official standalone Codex installation.
+`caffeinate` is already included with macOS.
 
-Codex Away expects the official standalone Codex installation and requires
-Codex Remote Control to have been configured once. If Codex is not installed,
-the installer tells you how to add it. `caffeinate` is included with macOS; no
-additional dependency needs to be installed.
-
-After installation, plug in and lock the Mac. Codex Away takes care of the
-rest. See [Troubleshooting](docs/troubleshooting.md) if it does not behave as
-expected.
+Once installed, plug in and lock your Mac. That is it.
 
 ## Why this exists
 
