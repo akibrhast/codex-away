@@ -18,6 +18,11 @@ Use this when you want to reach Codex running on your Mac from another authorize
 
 It is particularly useful for a MacBook that acts as an occasional remote development machine while docked or charging.
 
+Remote availability does not currently guarantee takeover of a conversation
+that is still owned by a live desktop Codex worker. See
+[Live desktop thread handoff](docs/live-thread-handoff.md) for the reproduced
+active-writer conflict, workaround, and candidate idle-worker release design.
+
 ## Requirements
 
 - macOS
@@ -129,6 +134,21 @@ If the listener does not start, inspect:
 ```sh
 cat "$HOME/Library/Application Support/CodexRemoteOnLock/launchd-error.log"
 ```
+
+### A live desktop conversation fails to load remotely
+
+If iOS displays `Error loading messages: Codex server returned an error`, but
+the controller log says Remote Control started successfully, inspect:
+
+```sh
+tail "$HOME/.codex/app-server-daemon/app-server.stderr.log"
+```
+
+An `already has an active writer` error means a live desktop Codex worker still
+owns that conversation. The Mac is reachable; only that thread's handoff is
+blocked. Start a new remote thread or let the desktop worker release the thread
+before locking. Do not kill arbitrary Codex processes. See
+[docs/live-thread-handoff.md](docs/live-thread-handoff.md).
 
 ### Remote commands hang in Desktop or Downloads threads
 

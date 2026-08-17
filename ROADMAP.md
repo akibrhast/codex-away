@@ -19,7 +19,7 @@ Mac stays awake
         ↓
 Open ChatGPT/Codex on iPhone
         ↓
-Continue any existing desktop conversation
+Continue a desktop conversation that is not held by a live writer
         ↓
 Return home and unlock Mac
         ↓
@@ -112,7 +112,15 @@ Codex Remote / the iOS app already provides:
 
 Therefore:
 
-## Session continuity is considered solved.
+## Session discovery is solved; live-thread takeover is not.
+
+Codex exposes desktop conversations remotely, but testing on Codex `0.147.0`
+found that a conversation still owned by a live desktop worker can fail with a
+thread-store `already has an active writer` conflict. Remote Control itself can
+be healthy while that one conversation is unavailable.
+
+See [docs/live-thread-handoff.md](docs/live-thread-handoff.md) for the observed
+evidence and safety constraints.
 
 This project does **not** need to build:
 
@@ -120,10 +128,12 @@ This project does **not** need to build:
 - project/session synchronization
 - session databases
 - custom context transfer
-- conversation handoff logic
+- custom conversation synchronization
 - tmux-based session continuity
 
-The project only needs to make the host reliably available.
+The project must make the host reliably available and, where Codex exposes safe
+worker-lifecycle controls, make live desktop threads transferable without
+interrupting active work.
 
 ---
 
@@ -361,6 +371,41 @@ Candidate observed-state signals, in preferred order:
 Do not use broad process-name matching or kill arbitrary Codex processes. The
 Mac may have interactive Codex sessions and editor integrations running at the
 same time.
+
+---
+
+## Priority 3A — Investigate Safe Live-Thread Handoff
+
+Observed failure:
+
+```text
+Remote Control = healthy
+desktop thread writer = still live
+        ↓
+iOS cannot load that thread
+        ↓
+thread-store conflict: already has an active writer
+```
+
+Investigate whether Codex exposes authoritative interfaces to:
+
+1. map a live writer to its exact conversation
+2. distinguish an executing/waiting turn from a genuinely idle worker
+3. ask an idle worker to release its writer gracefully
+4. verify that Remote Control can then resume the conversation
+
+Lock remains the trigger for remote activation. Worker state is an additional
+handoff-readiness check, not a replacement activation policy.
+
+Safety rule:
+
+> Preserve the worker unless both its identity and idle state are authoritative.
+
+Never infer safety from quiet output, elapsed time, or a broad process-name
+match. Never terminate a worker that is running, queued, awaiting approval,
+waiting on a tool or subtask, or in an unknown state. If Codex provides no safe
+inspection and graceful-release mechanism, document the limitation and do not
+automate worker shutdown.
 
 ---
 
@@ -830,9 +875,9 @@ Previous idea:
 
 Reason for removal:
 
-Codex already exposes the desktop machine's existing conversations in the iOS app and allows those sessions to continue.
-
-Therefore tmux adds little value to the actual mobile Codex workflow.
+Codex exposes desktop conversations in the iOS app. A live-writer conflict can
+prevent immediate takeover of one conversation, but tmux does not solve that
+Codex persistence-ownership problem.
 
 Status:
 
@@ -854,8 +899,8 @@ Previous idea:
 Reason for removal:
 
 Codex already provides chronological access to desktop conversations from iOS.
-
-The existing active conversation can simply be reopened and continued.
+The project should investigate safe release of an idle live writer, but should
+not build its own session database or context-transfer system.
 
 Status:
 
@@ -1139,6 +1184,33 @@ startup work cannot leave remote mode enabled after policy becomes false.
 
 ---
 
+## Investigation — Idle-Worker Release for Live Handoff
+
+This is a gated discovery task, not yet an implementation milestone.
+
+- reproduce the active-writer conflict with controlled desktop thread states
+- determine whether Codex exposes authoritative per-thread turn/worker state
+- determine whether Codex exposes a supported graceful writer-release action
+- distinguish idle from running, queued, approval-waiting, tool-waiting,
+  subtask-waiting, and unknown states
+- verify that releasing one idle writer does not affect other Codex sessions
+- verify that the same thread becomes loadable through Remote Control
+- stop the investigation without automation if safe state or release controls
+  are unavailable
+
+Only after the discovery evidence and design receive user confirmation should
+this become an implementation milestone.
+
+Success threshold:
+
+```text
+An exact, verifiably idle desktop thread writer can be released gracefully and
+the same conversation can then be resumed remotely, without interrupting any
+active or uncertain worker.
+```
+
+---
+
 ## Milestone 5 — Remote Lifecycle State
 
 Implement and derive:
@@ -1317,7 +1389,8 @@ The project is successful when the following behavior becomes boring and trustwo
 
 7. See desktop Codex conversations.
 
-8. Continue the conversation that was already in progress.
+8. Continue the conversation that was already in progress, provided its live
+   desktop writer has been safely released; otherwise use a new remote thread.
 
 9. Return home.
 
