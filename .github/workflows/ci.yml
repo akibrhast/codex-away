@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests
+        run: swift test
+      - name: Validate installer scripts
+        run: |
+          sh -n install.sh
+          zsh -n scripts/install-release.sh
+          zsh -n scripts/install-source.sh
+          zsh -n scripts/build-release.sh

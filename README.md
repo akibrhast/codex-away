@@ -90,8 +90,7 @@ the Mac remains locked makes the services available again.
 
 ### Requirements
 
-- macOS
-- Xcode or Xcode Command Line Tools, including `swiftc`
+- macOS 13 or later on Apple Silicon or Intel
 - The standalone Codex installation managed by the official installer
 - Codex Remote Control configured and tested at least once
 
@@ -114,16 +113,17 @@ codex remote-control start
 codex remote-control stop
 ```
 
-### Install the controller
+### Install Codex Away
 
-Clone this repository and run:
+Run the installer:
 
 ```sh
-./install.sh
+curl -fsSL https://raw.githubusercontent.com/akibrhast/codex-away/main/install.sh | sh
 ```
 
-The installer compiles the listener, installs it for the current user, and
-starts its LaunchAgent automatically. Existing Codex Remote on Lock
+The installer downloads the latest universal release from GitHub, verifies its
+SHA-256 checksum and Developer ID signature, installs it for the current user,
+and starts its LaunchAgent automatically. Existing Codex Remote on Lock
 installations are migrated in place: the legacy controller is unloaded, its
 ownership and diagnostic state are preserved, and only the Codex Away
 LaunchAgent remains active.
@@ -219,14 +219,13 @@ Inspect the LaunchAgent error log:
 cat "$HOME/Library/Application Support/CodexAway/launchd-error.log"
 ```
 
-Reinstall after changing the source:
+Reinstall the latest published release:
 
 ```sh
-./install.sh
+curl -fsSL https://raw.githubusercontent.com/akibrhast/codex-away/main/install.sh | sh
 ```
 
-The installer rebuilds the listener, replaces the installed binary, and
-reloads the LaunchAgent.
+The installer replaces the installed binary and reloads the LaunchAgent.
 
 ### A live desktop conversation fails to load remotely
 
@@ -323,6 +322,22 @@ Build the release executable without installing it:
 ```sh
 swift build --configuration release --product codex-away
 ```
+
+Install the current source checkout for local development:
+
+```sh
+./scripts/install-source.sh
+```
+
+Create a signed universal release bundle:
+
+```sh
+CODEX_AWAY_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+  ./scripts/build-release.sh v0.1.0
+```
+
+Release maintainers should follow [Releasing Codex Away](docs/releasing.md) to
+configure signing and notarization secrets and publish versioned artifacts.
 
 Internal Swift target names remain unchanged. They do not affect the public
 product identity.

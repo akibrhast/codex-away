@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify tag and run tests
+        run: |
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]
+          swift test
+
+      - name: Create temporary signing keychain
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+        run: |
+          certificate_path="$RUNNER_TEMP/developer-id.p12"
+          keychain_path="$RUNNER_TEMP/codex-away-signing.keychain-db"
+          keychain_password=$(openssl rand -hex 24)
+          printf '%s' "$CERTIFICATE_BASE64" | base64 -D > "$certificate_path"
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" \
+            -P "$CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$keychain_path"
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "$keychain_password" \
+            "$keychain_path"
+          security list-keychains -d user -s "$keychain_path"
+          signing_identity=$(security find-identity -v -p codesigning "$keychain_path" | sed -n 's/.*"\(Developer ID Application:[^"]*\)"/\1/p' | head -1)
+          test -n "$signing_identity"
+          printf 'CODEX_AWAY_SIGNING_IDENTITY=%s\n' "$signing_identity" >> "$GITHUB_ENV"
+
+      - name: Build and sign universal release
+        run: scripts/build-release.sh "$GITHUB_REF_NAME" "$RUNNER_TEMP/release"
+
+      - name: Prepare notarization key
+        env:
+          NOTARY_KEY_BASE64: ${{ secrets.APPLE_NOTARY_KEY_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+        run: |
+          printf '%s' "$NOTARY_KEY_BASE64" | base64 -D > "$RUNNER_TEMP/AuthKey_${NOTARY_KEY_ID}.p8"
+          chmod 600 "$RUNNER_TEMP/AuthKey_${NOTARY_KEY_ID}.p8"
+
+      - name: Notarize release payload
+        env:
+          NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: |
+          xcrun notarytool submit \
+            "$RUNNER_TEMP/release/codex-away-macos-universal-notarization.zip" \
+            --key "$RUNNER_TEMP/AuthKey_${NOTARY_KEY_ID}.p8" \
+            --key-id "$NOTARY_KEY_ID" \
+            --issuer "$NOTARY_ISSUER_ID" \
+            --wait
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "$RUNNER_TEMP/release/codex-away-macos-universal.tar.gz" \
+            "$RUNNER_TEMP/release/codex-away-macos-universal.tar.gz.sha256" \
+            --title "Codex Away $GITHUB_REF_NAME" \
+            --generate-notes \
+            --verify-tag

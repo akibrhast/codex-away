@@ -22,6 +22,7 @@ fi
 
 rm -f "$plist" "$legacy_plist"
 rm -f "$support_dir/codex-away"
+rm -f "$support_dir/VERSION"
 rm -f "$legacy_support_dir/codex-remote-on-lock"
 
 print "Uninstalled $label"
