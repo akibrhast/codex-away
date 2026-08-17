@@ -358,11 +358,19 @@ product identity.
 ## Support Codex Away
 
 <p align="center">
+  <a href="https://github.com/sponsors/akibrhast">
+    <img src="https://img.shields.io/badge/Sponsor_on_GitHub-EA4AAA?style=for-the-badge&amp;logo=githubsponsors&amp;logoColor=white"
+         alt="Sponsor Codex Away on GitHub"
+         height="40">
+  </a>
+  &nbsp;
   <a href="https://buymeacoffee.com/akibrhast">
     <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png"
          alt="Buy me a coffee and support Codex Away"
-         height="50">
+         height="40">
   </a>
 </p>
 
-Support is optional and helps fund continued development.
+Sponsor ongoing development through [GitHub Sponsors](https://github.com/sponsors/akibrhast),
+or make a one-time contribution through [Buy Me a Coffee](https://buymeacoffee.com/akibrhast).
+Support is entirely optional and does not affect access to the project or its features.
