@@ -9,13 +9,25 @@ public final class ReconciliationCoordinator {
     }
 
     private let reconciler: ServiceReconciler
+    private let logger: ServiceLogger
     private var revision: UInt64 = 0
     private var activeDesiredState: Bool?
     private var pendingRequest: Request?
     private var worker: Task<Void, Never>?
 
-    public init(reconciler: ServiceReconciler) {
+    public private(set) var lifecycle = RemoteLifecycleSnapshot(
+        phase: .off,
+        reason: "controller initialized",
+        failure: nil,
+        revision: 0
+    )
+
+    public init(
+        reconciler: ServiceReconciler,
+        logger: @escaping ServiceLogger = { _ in }
+    ) {
         self.reconciler = reconciler
+        self.logger = logger
     }
 
     @discardableResult
@@ -26,6 +38,17 @@ public final class ReconciliationCoordinator {
             desiredRemoteState: desiredRemoteState,
             reason: reason
         )
+
+        if !desiredRemoteState {
+            transition(
+                to: RemoteLifecycleEvaluator.begin(
+                    previous: lifecycle,
+                    desiredRemoteState: false,
+                    reason: reason,
+                    revision: revision
+                )
+            )
+        }
 
         if activeDesiredState == desiredRemoteState, pendingRequest == nil {
             return revision
@@ -54,9 +77,32 @@ public final class ReconciliationCoordinator {
         while let request = pendingRequest {
             pendingRequest = nil
             activeDesiredState = request.desiredRemoteState
-            await reconciler.reconcile(
+
+            let initialObservations = request.desiredRemoteState
+                ? await reconciler.inspectServices()
+                : nil
+            let inProgress = RemoteLifecycleEvaluator.begin(
+                previous: lifecycle,
                 desiredRemoteState: request.desiredRemoteState,
-                reason: request.reason
+                reason: request.reason,
+                revision: request.revision,
+                requiredServicesHealthy: initialObservations.map(
+                    ReconciliationReport.requiredServicesHealthy
+                )
+            )
+            transition(to: inProgress)
+
+            let report = await reconciler.reconcile(
+                desiredRemoteState: request.desiredRemoteState,
+                reason: request.reason,
+                initialObservations: initialObservations
+            )
+            guard request.revision == revision else { continue }
+            transition(
+                to: RemoteLifecycleEvaluator.complete(
+                    inProgress: inProgress,
+                    report: report
+                )
             )
         }
         activeDesiredState = nil
@@ -64,5 +110,17 @@ public final class ReconciliationCoordinator {
         if pendingRequest != nil {
             startWorkerIfNeeded()
         }
+    }
+
+    private func transition(to next: RemoteLifecycleSnapshot) {
+        let previous = lifecycle
+        lifecycle = next
+        guard previous.phase != next.phase || previous.failure != next.failure else { return }
+
+        var message = "lifecycle \(previous.phase.rawValue) → \(next.phase.rawValue): \(next.reason)"
+        if let failure = next.failure {
+            message += "; failure: \(failure)"
+        }
+        logger(message)
     }
 }

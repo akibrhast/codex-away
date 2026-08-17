@@ -45,7 +45,8 @@ final class Controller {
             logger: serviceLogger
         )
         return ReconciliationCoordinator(
-            reconciler: ServiceReconciler(services: [codexRemote, caffeinate])
+            reconciler: ServiceReconciler(services: [codexRemote, caffeinate]),
+            logger: serviceLogger
         )
     }()
 

@@ -8,10 +8,11 @@ final class ServiceReconcilerTests: XCTestCase {
         let second = MockManagedService(id: "second", health: .stopped)
         let reconciler = ServiceReconciler(services: [first, second])
 
-        await reconciler.reconcile(desiredRemoteState: true, reason: "lock")
+        let report = await reconciler.reconcile(desiredRemoteState: true, reason: "lock")
 
-        XCTAssertEqual(first.events, ["inspect", "start:lock"])
-        XCTAssertEqual(second.events, ["inspect", "start:lock"])
+        XCTAssertEqual(first.events, ["inspect", "start:lock", "inspect"])
+        XCTAssertEqual(second.events, ["inspect", "start:lock", "inspect"])
+        XCTAssertTrue(report.requiredServicesHealthy)
     }
 
     func testRequiredStartFailureStopsLaterServices() async {
@@ -20,10 +21,12 @@ final class ServiceReconcilerTests: XCTestCase {
         let second = MockManagedService(id: "later", health: .stopped)
         let reconciler = ServiceReconciler(services: [first, second])
 
-        await reconciler.reconcile(desiredRemoteState: true, reason: "lock")
+        let report = await reconciler.reconcile(desiredRemoteState: true, reason: "lock")
 
-        XCTAssertEqual(first.events, ["inspect", "start:lock"])
-        XCTAssertTrue(second.events.isEmpty)
+        XCTAssertEqual(first.events, ["inspect", "start:lock", "inspect"])
+        XCTAssertEqual(second.events, ["inspect", "inspect"])
+        XCTAssertFalse(report.requiredServicesHealthy)
+        XCTAssertNotNil(report.requiredFailure)
     }
 
     func testOptionalStartFailureContinuesToLaterServices() async {
@@ -32,9 +35,10 @@ final class ServiceReconcilerTests: XCTestCase {
         let second = MockManagedService(id: "later", health: .stopped)
         let reconciler = ServiceReconciler(services: [first, second])
 
-        await reconciler.reconcile(desiredRemoteState: true, reason: "lock")
+        let report = await reconciler.reconcile(desiredRemoteState: true, reason: "lock")
 
-        XCTAssertEqual(second.events, ["inspect", "start:lock"])
+        XCTAssertEqual(second.events, ["inspect", "start:lock", "inspect"])
+        XCTAssertTrue(report.requiredServicesHealthy)
     }
 
     func testDesiredOffAttemptsEveryActiveServiceDespiteFailure() async {
@@ -43,20 +47,27 @@ final class ServiceReconcilerTests: XCTestCase {
         let second = MockManagedService(id: "second", health: .unhealthy("failed"))
         let reconciler = ServiceReconciler(services: [first, second])
 
-        await reconciler.reconcile(desiredRemoteState: false, reason: "unlock")
+        let report = await reconciler.reconcile(desiredRemoteState: false, reason: "unlock")
 
-        XCTAssertEqual(first.events, ["inspect", "stop:unlock"])
-        XCTAssertEqual(second.events, ["inspect", "stop:unlock"])
+        XCTAssertEqual(first.events, ["inspect", "stop:unlock", "inspect"])
+        XCTAssertEqual(second.events, ["inspect", "stop:unlock", "inspect"])
+        XCTAssertNotNil(report.requiredOperationFailure)
     }
 
     func testHealthyAndStoppedServicesRequireNoAction() async {
         let healthy = MockManagedService(id: "healthy", health: .healthy)
         let stopped = MockManagedService(id: "stopped", health: .stopped)
 
-        await ServiceReconciler(services: [healthy]).reconcile(desiredRemoteState: true, reason: "test")
-        await ServiceReconciler(services: [stopped]).reconcile(desiredRemoteState: false, reason: "test")
+        _ = await ServiceReconciler(services: [healthy]).reconcile(
+            desiredRemoteState: true,
+            reason: "test"
+        )
+        _ = await ServiceReconciler(services: [stopped]).reconcile(
+            desiredRemoteState: false,
+            reason: "test"
+        )
 
-        XCTAssertEqual(healthy.events, ["inspect"])
-        XCTAssertEqual(stopped.events, ["inspect"])
+        XCTAssertEqual(healthy.events, ["inspect", "inspect"])
+        XCTAssertEqual(stopped.events, ["inspect", "inspect"])
     }
 }

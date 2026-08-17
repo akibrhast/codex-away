@@ -202,7 +202,7 @@ Commit: `d049cd1`
 Current test baseline:
 
 ```text
-56 tests passing
+66 tests passing
 ```
 
 These abstractions are retained because they directly support reliability.
@@ -1239,7 +1239,7 @@ active or uncertain worker.
 
 ---
 
-## Milestone 5 — Remote Lifecycle State
+## Milestone 5 — Remote Lifecycle State — COMPLETED
 
 Implement and derive:
 
@@ -1251,10 +1251,17 @@ RECOVERING
 ERROR
 ```
 
-- compute overall status from desired state plus required-service health
-- record the latest transition reason and failure
-- keep state internal until a later CLI or UI needs it
-- add transition-table tests
+- derives `OFF`, `STARTING`, `READY`, `RECOVERING`, and `ERROR` from desired
+  state, prior lifecycle, required-service health, and operation failures
+- records lifecycle revision, transition time, latest reason, and failure
+- makes reconciliation return structured service observations and operation
+  results
+- logs meaningful lifecycle transitions while keeping state internal
+- prevents healthy audits from falsely entering `RECOVERING`
+- rejects stale reconciliation completions after newer machine-state events
+- adds lifecycle transition-table, failure, recovery, and coordinator tests
+
+Automatic health monitoring, retries, and backoff remain Milestone 6.
 
 Success:
 
