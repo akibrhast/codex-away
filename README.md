@@ -2,6 +2,9 @@
 
 Codex Remote on Lock is a small, event-driven macOS LaunchAgent for making a Mac available through Codex Remote only when it is unattended and connected to power.
 
+See [ROADMAP.md](ROADMAP.md) for the canonical project scope, completed
+milestones, and approved implementation order.
+
 When the screen locks while the Mac is using AC power, it starts:
 
 - `codex remote-control start`
