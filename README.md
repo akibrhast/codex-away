@@ -5,6 +5,9 @@ Codex Remote on Lock is a small, event-driven macOS LaunchAgent for making a Mac
 See [ROADMAP.md](ROADMAP.md) for the canonical project scope, completed
 milestones, and approved implementation order.
 
+The primary workflow's automated and manual acceptance evidence is recorded in
+[Reliability acceptance testing](docs/reliability-testing.md).
+
 When the screen locks while the Mac is using AC power, it starts:
 
 - `codex remote-control start`

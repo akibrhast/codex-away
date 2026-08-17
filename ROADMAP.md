@@ -1418,11 +1418,14 @@ Ordinary network interruptions recover without user intervention.
 
 ---
 
-## Milestone 10 — Reliability Testing — NEXT ACTIVE
+## Milestone 10 — Reliability Testing — COMPLETED
+
+Completed on 2026-08-17. Full evidence and acceptance boundaries are recorded
+in [docs/reliability-testing.md](docs/reliability-testing.md).
 
 Run deliberate failure tests.
 
-### Test A
+### Test A — PASSED
 
 ```text
 lock Mac
@@ -1432,7 +1435,7 @@ verify RECOVERING
 verify READY
 ```
 
-### Test B
+### Test B — PASSED
 
 ```text
 lock Mac
@@ -1442,7 +1445,7 @@ reconnect AC
 verify READY
 ```
 
-### Test C
+### Test C — PASSED
 
 ```text
 lock
@@ -1470,7 +1473,7 @@ restore network
 verify recovery
 ```
 
-### Test F
+### Test F — PASSED FROM EXISTING RESTART EVIDENCE
 
 ```text
 lock Mac
@@ -1478,7 +1481,7 @@ restart controller daemon
 verify observed state reconstruction
 ```
 
-### Test G
+### Test G — MANUAL PATH PASSED; AUTOMATIC RELEASE BLOCKED UPSTREAM
 
 ```text
 lock Mac with an exact, authoritatively idle desktop thread
@@ -1501,6 +1504,10 @@ Success:
 The acceptance workflow remains reliable across ordinary lifecycle changes and
 deliberately induced failures.
 ```
+
+Milestone result: **PASSED for the primary locked + AC workflow.** Deferred
+hardening and the upstream automatic thread-release gap are not counted as
+delivered behavior.
 
 ---
 
