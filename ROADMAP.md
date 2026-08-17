@@ -1274,7 +1274,7 @@ READY to RECOVERING and back to READY without user intervention.
 
 ---
 
-## Milestone 7 — Safe Live-Thread Handoff — NEXT
+## Milestone 7 — Safe Live-Thread Handoff — UPSTREAM CAPABILITY GAP
 
 This primary milestone has two mandatory gates.
 
@@ -1290,10 +1290,41 @@ This primary milestone has two mandatory gates.
 - verify that a released idle thread becomes loadable through Remote Control
 - verify that no other Codex conversation or process is affected
 
+Phase A result on Codex `0.147.0` (2026-08-17):
+
+- authoritative thread status is available: `notLoaded`, `idle`,
+  `systemError`, or `active` with active-state flags
+- authoritative turn status and thread lifecycle notifications are available
+- multiple `codex resume <session-id>` clients can cooperatively join one
+  managed app-server and do not reproduce the cross-process writer conflict
+- the desktop client and managed Remote Control daemon run separate app-server
+  processes, which is the boundary at which the writer conflict occurs
+- `thread/unsubscribe` is not an immediate release; after the final subscriber
+  leaves, unload requires 30 minutes without subscribers or thread activity
+- no stable or experimental `0.147.0` protocol method provides immediate
+  per-thread unload, writer release, or ownership transfer
+- normal `Ctrl+C` shutdown of a terminal Codex owner releases its writer and
+  preserves the session for later `codex resume <session-id>`
+- normal shutdown of the managed Remote Control daemon releases its ownership,
+  allowing the session to return to the Mac terminal after unlock
+
+Result: manual process-lifecycle handoff is supported and its complete
+terminal → phone → terminal round trip is verified. Automatic isolated handoff
+passes the authoritative-state half of the gate, but not the exact per-thread
+release half. Keep live-thread handoff as a primary open requirement and
+re-evaluate the automatic path on Codex upgrades. See
+[docs/live-thread-handoff.md](docs/live-thread-handoff.md) for the evidence.
+
 ### Phase B — Supported implementation
 
 Proceed only if Phase A identifies both authoritative idle-state evidence and a
 graceful release mechanism.
+
+Current status: the manual terminal → phone → terminal path has passed formal
+acceptance testing. Automatic isolated handoff is blocked on the missing
+immediate per-thread release or a supported shared app-server ownership model.
+This is not deferred behind the later network milestone; it remains the
+highest-priority capability gap.
 
 - evaluate handoff readiness when lock activates remote mode
 - release only the exact, authoritatively idle desktop writer
