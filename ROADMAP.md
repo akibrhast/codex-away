@@ -543,9 +543,15 @@ Do not assume an in-memory `Process` reference is sufficient forever.
 
 ---
 
-# 7. Sleep / Wake Recovery
+# 7. Deferred Sleep / Wake Hardening
 
-Because this is a daily-use Mac, sleep/wake behavior is more important than server features.
+This is outside the primary workflow. While remote mode is active on AC power,
+the controller-owned `caffeinate -s` assertion prevents system sleep. The user's
+normal clamshell setup therefore does not exercise a sleep/wake transition.
+
+Keep explicit sleep/wake recovery as optional defensive hardening for a future
+case where the sleep assertion is absent, lost, or deliberately bypassed. It is
+not a prerequisite for the main lock → phone → unlock workflow.
 
 On wake, assume previous runtime knowledge may be stale.
 
@@ -1351,7 +1357,16 @@ work.
 
 ---
 
-## Milestone 8 — Sleep / Wake Recovery
+## Milestone 8 — Sleep / Wake Recovery (Deferred Hardening)
+
+Status: **DEFERRED — outside the main workflow while `caffeinate -s` is healthy.**
+
+No sleep/wake-specific controller code is planned for the current development
+sequence. Revisit only if real usage shows that the Mac can sleep while remote
+mode is active, or if the product later supports operation without the managed
+sleep assertion.
+
+Possible future scope:
 
 - subscribe to relevant macOS sleep/wake events
 - invalidate stale runtime assumptions before sleep
@@ -1359,7 +1374,7 @@ work.
 - inspect actual managed services
 - reconcile from observed reality
 
-Success:
+Future success criterion:
 
 ```text
 Sleep/wake does not strand remote access or leave remote mode running after the
@@ -1420,7 +1435,7 @@ lock
 verify correct final state
 ```
 
-### Test D
+### Test D — Deferred sleep/wake hardening
 
 ```text
 lock Mac
