@@ -603,7 +603,20 @@ OFF
 
 ---
 
-# 8. Network Loss / Recovery
+# 8. Deferred Network Recovery
+
+Dedicated network-state handling is outside the primary workflow for now. The
+current controller should remain small until real usage shows that an ordinary
+Wi-Fi interruption leaves Remote Control stranded after connectivity returns.
+
+Revisit this work only if either of these conditions is observed repeatedly:
+
+- Remote Control does not become usable again after the network reconnects.
+- The controller remains in an incorrect lifecycle state after connectivity is
+  restored.
+
+Until then, diagnose individual connectivity failures from logs rather than
+adding network availability to policy or reconciliation state.
 
 Do not build trusted-network policy yet.
 
@@ -632,9 +645,9 @@ reconcile
 verify READY
 ```
 
-The goal is recovery from ordinary network interruptions. Captive-portal
-retention and guest-session reauthentication are deferred outside the main
-workflow.
+This is possible future recovery behavior, not part of the current development
+sequence. Captive-portal retention and guest-session reauthentication also
+remain deferred outside the main workflow.
 
 ### Not currently needed
 
@@ -1383,7 +1396,12 @@ user returns.
 
 ---
 
-## Milestone 9 — Network Recovery
+## Milestone 9 — Network Recovery (Deferred Hardening)
+
+Status: **DEFERRED — implement only after a repeatable network-recovery failure
+appears in real use.**
+
+Possible future scope:
 
 - add network availability to `MachineState`
 - detect connectivity loss and restoration
@@ -1392,7 +1410,7 @@ user returns.
 - determine through testing whether network loss should mean ERROR or a
   distinct non-ready condition
 
-Success:
+Future success criterion:
 
 ```text
 Ordinary network interruptions recover without user intervention.
@@ -1400,7 +1418,7 @@ Ordinary network interruptions recover without user intervention.
 
 ---
 
-## Milestone 10 — Reliability Testing
+## Milestone 10 — Reliability Testing — NEXT ACTIVE
 
 Run deliberate failure tests.
 
@@ -1443,7 +1461,7 @@ sleep/wake
 verify final state
 ```
 
-### Test E
+### Test E — Deferred network-recovery hardening
 
 ```text
 lock Mac
