@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.openai.codex.remote-on-lock</string>
+  <string>com.akibrhast.codex-away</string>
 
   <key>ProgramArguments</key>
   <array>
-    <string>__HOME__/Library/Application Support/CodexRemoteOnLock/codex-remote-on-lock</string>
+    <string>__HOME__/Library/Application Support/CodexAway/codex-away</string>
   </array>
 
   <key>RunAtLoad</key>
@@ -17,9 +17,9 @@
   <string>Background</string>
 
   <key>StandardOutPath</key>
-  <string>__HOME__/Library/Application Support/CodexRemoteOnLock/launchd.log</string>
+  <string>__HOME__/Library/Application Support/CodexAway/launchd.log</string>
 
   <key>StandardErrorPath</key>
-  <string>__HOME__/Library/Application Support/CodexRemoteOnLock/launchd-error.log</string>
+  <string>__HOME__/Library/Application Support/CodexAway/launchd-error.log</string>
 </dict>
 </plist>

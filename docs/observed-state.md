@@ -48,7 +48,7 @@ Observed health and controller ownership are separate.
 The controller stores versioned ownership metadata at:
 
 ```text
-~/Library/Application Support/CodexRemoteOnLock/service-ownership.json
+~/Library/Application Support/CodexAway/service-ownership.json
 ```
 
 The earlier plain `state` file is migrated once. A legacy value of `on` means

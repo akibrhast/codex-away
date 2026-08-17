@@ -116,18 +116,16 @@ Clone this repository and run:
 ```
 
 The installer compiles the listener, installs it for the current user, and
-starts its LaunchAgent automatically.
+starts its LaunchAgent automatically. Existing Codex Remote on Lock
+installations are migrated in place: the legacy controller is unloaded, its
+ownership and diagnostic state are preserved, and only the Codex Away
+LaunchAgent remains active.
 
-> [!NOTE]
-> The product is now named Codex Away, but the executable, LaunchAgent, and
-> Application Support paths retain their original implementation names until
-> the separate migration is completed.
-
-Current installed paths:
+Installed paths:
 
 ```text
-~/Library/Application Support/CodexRemoteOnLock/codex-remote-on-lock
-~/Library/LaunchAgents/com.openai.codex.remote-on-lock.plist
+~/Library/Application Support/CodexAway/codex-away
+~/Library/LaunchAgents/com.akibrhast.codex-away.plist
 ```
 
 ## Verify operation
@@ -135,13 +133,13 @@ Current installed paths:
 Check that the listener is loaded:
 
 ```sh
-launchctl print "gui/$(id -u)/com.openai.codex.remote-on-lock"
+launchctl print "gui/$(id -u)/com.akibrhast.codex-away"
 ```
 
 Follow its activity log:
 
 ```sh
-tail -f "$HOME/Library/Application Support/CodexRemoteOnLock/controller.log"
+tail -f "$HOME/Library/Application Support/CodexAway/controller.log"
 ```
 
 While connected to AC power, lock and unlock the Mac. The log should show a
@@ -211,7 +209,7 @@ capability gap are documented in
 Inspect the LaunchAgent error log:
 
 ```sh
-cat "$HOME/Library/Application Support/CodexRemoteOnLock/launchd-error.log"
+cat "$HOME/Library/Application Support/CodexAway/launchd-error.log"
 ```
 
 Reinstall after changing the source:
@@ -259,9 +257,9 @@ Run:
 ./uninstall.sh
 ```
 
-This unloads the LaunchAgent, stops controller-owned services, and removes the
+This unloads the LaunchAgent, stops Codex Remote Control, and removes the
 installed executable and plist. Logs and state remain under
-`~/Library/Application Support/CodexRemoteOnLock` for troubleshooting.
+`~/Library/Application Support/CodexAway` for troubleshooting.
 
 ## Technical architecture
 
@@ -316,11 +314,11 @@ swift test
 Build the release executable without installing it:
 
 ```sh
-swift build --configuration release --product codex-remote-on-lock
+swift build --configuration release --product codex-away
 ```
 
-Internal Swift target names remain unchanged for now. They do not block the
-public product identity.
+Internal Swift target names remain unchanged. They do not affect the public
+product identity.
 
 ## Security
 

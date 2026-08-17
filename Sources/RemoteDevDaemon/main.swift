@@ -13,7 +13,7 @@ final class Controller {
     private var stateRevision: UInt64 = 0
 
     private var codex: String { homeDirectory.appendingPathComponent(".codex/packages/standalone/current/codex").path }
-    private var stateDirectory: URL { homeDirectory.appendingPathComponent("Library/Application Support/CodexRemoteOnLock") }
+    private var stateDirectory: URL { homeDirectory.appendingPathComponent("Library/Application Support/CodexAway") }
     private var logFile: URL { stateDirectory.appendingPathComponent("controller.log") }
     private let commandRunner: any CommandRunning = ProcessCommandRunner()
     private lazy var reconciliationCoordinator: ReconciliationCoordinator = {

@@ -3,14 +3,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "CodexRemoteOnLock",
+    name: "CodexAway",
     platforms: [
         .macOS(.v13),
     ],
     products: [
         .library(name: "RemoteDevCore", targets: ["RemoteDevCore"]),
         .library(name: "RemoteDevServices", targets: ["RemoteDevServices"]),
-        .executable(name: "codex-remote-on-lock", targets: ["RemoteDevDaemon"]),
+        .executable(name: "codex-away", targets: ["RemoteDevDaemon"]),
     ],
     targets: [
         .target(name: "RemoteDevCore"),
