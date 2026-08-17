@@ -21,7 +21,7 @@ It is for people who occasionally want to continue their Codex work from an
 iPhone without carrying a MacBook everywhere “just in case.”
 
 > Leave your Mac behind without losing the ability to continue working from
-> your phone.
+> your iPhone.
 
 ## Install
 
@@ -31,6 +31,11 @@ curl -fsSL https://raw.githubusercontent.com/akibrhast/codex-away/main/install.s
 
 **Requires:** macOS 13+ and the official standalone Codex installation.
 `caffeinate` is already included with macOS.
+
+> [!NOTE]
+> Mobile access currently requires the **Remote** option in the official
+> ChatGPT app for iPhone. The Android app does not currently expose this
+> option, so Codex Away cannot be controlled from Android yet.
 
 Once installed, plug in and lock your Mac. That is it.
 
@@ -44,7 +49,7 @@ flowchart TD
     A[Working normally on Mac] --> B[Plug in and lock]
     B --> C[Codex Away activates]
     C --> D[Remote Control on<br/>Mac awake and monitored]
-    D --> E[Continue from phone]
+    D --> E[Continue from iPhone]
     E --> F[Unlock Mac]
     F --> G[Remote mode off<br/>Normal Mac again]
     D -->|AC power disconnected| G
@@ -66,7 +71,8 @@ the Mac remains locked makes the services available again.
 - Reconstructs managed state after controller restarts.
 - Avoids stopping unrelated Codex processes.
 - Runs as a per-user, event-driven macOS LaunchAgent.
-- Requires no custom phone application, relay, or session interface.
+- Uses the Remote option in the official ChatGPT app for iPhone; no separate
+  Codex Away mobile app, relay, or session interface is required.
 
 ## Reliability
 
@@ -97,11 +103,11 @@ process-safety model.
 
 ### Active desktop conversations
 
-Codex Remote can expose desktop conversations to the phone, but a conversation
+Codex Remote can expose desktop conversations to the iPhone, but a conversation
 still owned by a live desktop Codex worker may not be immediately resumable
 remotely.
 
-If you intend to continue the same terminal conversation from your phone,
+If you intend to continue the same terminal conversation from your iPhone,
 release the terminal Codex session with `Ctrl+C` before locking the Mac. Codex
 Away does not kill arbitrary Codex workers to force a handoff.
 
