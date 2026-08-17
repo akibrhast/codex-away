@@ -4,6 +4,11 @@
 
 **Lock it. Leave it. Keep coding.**
 
+> [!IMPORTANT]
+> Codex Away is an independent, community-built companion utility. It is not
+> affiliated with, endorsed by, or sponsored by OpenAI. Codex is a product of
+> OpenAI.
+
 Codex Away automatically makes your Mac available through Codex Remote when
 you step away.
 
@@ -322,6 +327,15 @@ swift build --configuration release --product codex-away
 Internal Swift target names remain unchanged. They do not affect the public
 product identity.
 
+## Support Codex Away
+
+If Codex Away makes it easier to leave your Mac behind and keep coding, you can
+[buy me a coffee](https://buymeacoffee.com/akibrhast). Buy Me a Coffee supports
+one-time contributions using major credit cards, Apple Pay, and Google Pay.
+
+Support is entirely optional and does not affect access to the project or its
+features.
+
 ## Security
 
 - Codex Remote Control makes the Mac available only through devices authorized
@@ -334,8 +348,3 @@ product identity.
   secure account configuration.
 - Codex currently labels `remote-control` experimental, so its behavior may
   change in future releases.
-
-## Disclaimer
-
-Codex Away is an independent utility and is not affiliated with or endorsed by
-OpenAI.
