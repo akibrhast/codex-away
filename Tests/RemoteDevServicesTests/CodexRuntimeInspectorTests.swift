@@ -11,8 +11,8 @@ final class CodexRuntimeInspectorTests: XCTestCase {
         XCTAssertEqual(fixture.runtime.inspect(), .running(fixture.identity))
     }
 
-    func testRemoteDisabledIsStoppedEvenWhenDaemonExists() throws {
-        let fixture = try makeFixture(remoteEnabled: false)
+    func testMissingRemotePIDRecordIsStopped() throws {
+        let fixture = try makeFixture(includePIDRecord: false)
         defer { try? FileManager.default.removeItem(at: fixture.directory) }
 
         XCTAssertEqual(fixture.runtime.inspect(), .stopped)
@@ -29,7 +29,7 @@ final class CodexRuntimeInspectorTests: XCTestCase {
 
         XCTAssertEqual(
             fixture.runtime.inspect(),
-            .invalid("Codex daemon arguments do not match")
+            .invalid("Codex Remote arguments do not match")
         )
     }
 
@@ -37,7 +37,7 @@ final class CodexRuntimeInspectorTests: XCTestCase {
         let identity = makeIdentity(
             pid: 90,
             executable: "/test/not-codex",
-            arguments: ["app-server", "daemon", "pid-update-loop"]
+            arguments: ["app-server", "--remote-control", "--listen", "unix://"]
         )
         let fixture = try makeFixture(identity: identity)
         defer { try? FileManager.default.removeItem(at: fixture.directory) }
@@ -69,9 +69,9 @@ final class CodexRuntimeInspectorTests: XCTestCase {
     }
 
     private func makeFixture(
-        remoteEnabled: Bool = true,
         identity: ProcessIdentity? = nil,
         recordedSeconds: UInt64? = nil,
+        includePIDRecord: Bool = true,
         includeObservedProcess: Bool = true
     ) throws -> (
         directory: URL,
@@ -85,26 +85,23 @@ final class CodexRuntimeInspectorTests: XCTestCase {
         let actualIdentity = identity ?? makeIdentity(
             pid: 90,
             executable: "/test/codex",
-            arguments: ["app-server", "daemon", "pid-update-loop"]
+            arguments: ["app-server", "--remote-control", "--listen", "unix://"]
         )
-        let settingsURL = directory.appendingPathComponent("settings.json")
         let pidURL = directory.appendingPathComponent("daemon.pid")
-        try JSONSerialization.data(withJSONObject: [
-            "remoteControlEnabled": remoteEnabled,
-        ]).write(to: settingsURL)
-        try JSONSerialization.data(withJSONObject: [
-            "pid": actualIdentity.processIdentifier,
-            "processStartTime": formattedStartTime(
-                seconds: recordedSeconds ?? actualIdentity.startTimeSeconds
-            ),
-        ]).write(to: pidURL)
+        if includePIDRecord {
+            try JSONSerialization.data(withJSONObject: [
+                "pid": actualIdentity.processIdentifier,
+                "processStartTime": formattedStartTime(
+                    seconds: recordedSeconds ?? actualIdentity.startTimeSeconds
+                ),
+            ]).write(to: pidURL)
+        }
 
         let processInspector = MockProcessInspector()
         if includeObservedProcess {
             processInspector.identities[actualIdentity.processIdentifier] = actualIdentity
         }
         let runtime = FileCodexRuntimeInspector(
-            settingsURL: settingsURL,
             pidURL: pidURL,
             expectedExecutable: "/test/codex",
             processInspector: processInspector

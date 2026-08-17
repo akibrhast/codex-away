@@ -30,8 +30,7 @@ final class Controller {
             outputURL: logFile,
             commandRunner: commandRunner,
             runtimeInspector: FileCodexRuntimeInspector(
-                settingsURL: codexDaemonDirectory.appendingPathComponent("settings.json"),
-                pidURL: codexDaemonDirectory.appendingPathComponent("app-server-updater.pid"),
+                pidURL: codexDaemonDirectory.appendingPathComponent("app-server.pid"),
                 expectedExecutable: codex,
                 processInspector: processInspector
             ),

@@ -13,39 +13,27 @@ public protocol CodexRuntimeInspecting {
 
 @MainActor
 public final class FileCodexRuntimeInspector: CodexRuntimeInspecting {
-    private struct Settings: Decodable {
-        let remoteControlEnabled: Bool
-    }
-
     private struct PIDRecord: Decodable {
         let pid: Int32
         let processStartTime: String
     }
 
-    private let settingsURL: URL
     private let pidURL: URL
     private let expectedExecutable: String
     private let processInspector: any ProcessInspecting
 
     public init(
-        settingsURL: URL,
         pidURL: URL,
         expectedExecutable: String,
         processInspector: any ProcessInspecting
     ) {
-        self.settingsURL = settingsURL
         self.pidURL = pidURL
         self.expectedExecutable = expectedExecutable
         self.processInspector = processInspector
     }
 
     public func inspect() -> CodexRuntimeObservation {
-        guard let settingsData = try? Data(contentsOf: settingsURL),
-              let settings = try? JSONDecoder().decode(Settings.self, from: settingsData)
-        else {
-            return .invalid("Codex daemon settings are unavailable")
-        }
-        guard settings.remoteControlEnabled else {
+        guard FileManager.default.fileExists(atPath: pidURL.path) else {
             return .stopped
         }
 
@@ -65,8 +53,8 @@ public final class FileCodexRuntimeInspector: CodexRuntimeInspecting {
         guard resolvedObserved == resolvedExpected else {
             return .invalid("Codex daemon executable does not match")
         }
-        guard observed.arguments == ["app-server", "daemon", "pid-update-loop"] else {
-            return .invalid("Codex daemon arguments do not match")
+        guard observed.arguments == ["app-server", "--remote-control", "--listen", "unix://"] else {
+            return .invalid("Codex Remote arguments do not match")
         }
         guard processStartTimeMatches(pidRecord.processStartTime, identity: observed) else {
             return .invalid("Codex daemon start time does not match")

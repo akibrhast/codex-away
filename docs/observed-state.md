@@ -8,33 +8,38 @@ the locally installed standalone Codex CLI version `0.147.0`.
 `codex remote-control` exposes `start`, `stop`, and `pair`. It does not expose a
 documented `status` command.
 
-When Remote Control is enabled, Codex maintains two useful artifacts:
+Codex keeps a persistent updater daemon running whether Remote Control is on or
+off. Its `settings.json`, `app-server-updater.pid`, and `pid-update-loop`
+process therefore must not be used as health signals.
+
+When Remote Control is actually running, Codex creates:
 
 ```text
-~/.codex/app-server-daemon/settings.json
-~/.codex/app-server-daemon/app-server-updater.pid
+~/.codex/app-server-daemon/app-server.pid
+~/.codex/app-server-control/app-server-control.sock
 ```
 
-The settings file contains the boolean `remoteControlEnabled`. The PID file is
-JSON containing a PID and a human-readable process start time.
+The PID file is JSON containing the live Remote Control app-server PID and a
+human-readable process start time. The socket is a corroborating lifecycle
+signal observed during discovery. `remote-control stop` removes the process,
+PID file, and control socket while leaving the updater daemon running.
 
-Neither artifact is trusted alone. The controller reports Codex Remote healthy
-only when all of these checks pass:
+The PID record is not trusted alone. The controller reports Codex Remote
+healthy only when all of these checks pass:
 
-- `remoteControlEnabled` is `true`
 - the PID metadata is valid
 - the PID currently exists
 - the kernel-reported executable resolves to the configured standalone Codex
   executable
-- the kernel-reported arguments are exactly `app-server daemon
-  pid-update-loop`
+- the kernel-reported arguments are exactly `app-server --remote-control
+  --listen unix://`
 - the kernel-reported process start time matches the Codex PID record
 
 This excludes interactive Codex sessions, editor integrations, and PID reuse.
 
-The artifact names and daemon arguments are implementation details of Codex
-0.147.0 and may change. A future Codex upgrade that changes them should produce
-an unhealthy/invalid observation rather than a false healthy result.
+The artifact names and Remote Control arguments are implementation details of
+Codex 0.147.0 and may change. A future Codex upgrade that changes them should
+produce an unhealthy/invalid observation rather than a false healthy result.
 
 ## Ownership
 

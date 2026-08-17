@@ -130,7 +130,7 @@ final class CodexRemoteServiceTests: XCTestCase {
         let replacement = makeIdentity(
             pid: 91,
             executable: executable,
-            arguments: ["app-server", "daemon", "pid-update-loop"]
+            arguments: ["app-server", "--remote-control", "--listen", "unix://"]
         )
         let service = makeService(
             runner: runner,
@@ -179,7 +179,7 @@ final class CodexRemoteServiceTests: XCTestCase {
         makeIdentity(
             pid: 90,
             executable: executable,
-            arguments: ["app-server", "daemon", "pid-update-loop"]
+            arguments: ["app-server", "--remote-control", "--listen", "unix://"]
         )
     }
 
