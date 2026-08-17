@@ -2,12 +2,6 @@
 
 Codex Remote on Lock is a small, event-driven macOS LaunchAgent for making a Mac available through Codex Remote only when it is unattended and connected to power.
 
-See [ROADMAP.md](ROADMAP.md) for the canonical project scope, completed
-milestones, and approved implementation order.
-
-The primary workflow's automated and manual acceptance evidence is recorded in
-[Reliability acceptance testing](docs/reliability-testing.md).
-
 When the screen locks while the Mac is using AC power, it starts:
 
 - `codex remote-control start`
@@ -15,16 +9,43 @@ When the screen locks while the Mac is using AC power, it starts:
 
 When the screen unlocks or AC power is disconnected, it stops both. The listener uses macOS session notifications and IOKit power-source events; it does not poll on a timer.
 
+## Project status
+
+The primary locked + AC workflow is complete and in daily use. Its automated
+and manual acceptance evidence is recorded in
+[Reliability acceptance testing](docs/reliability-testing.md); the current
+suite contains 73 passing tests.
+
+There are no active implementation milestones. Remaining ideas are deliberately
+trigger-based:
+
+- Revisit sleep/wake recovery only if the managed `caffeinate -s` assertion
+  fails to keep the Mac awake in real use.
+- Revisit dedicated network recovery only after a repeatable reconnection
+  failure.
+- Revisit captive-portal retention only if guest-network expiration becomes a
+  recurring problem worth automating.
+- Consider a menu-bar UI or diagnostic CLI only if daily use demonstrates a
+  concrete need.
+
+Automatic takeover of a conversation still owned by a live desktop Codex
+worker is blocked by the lack of a safe immediate per-thread release mechanism.
+The verified manual Mac → phone → Mac workflow and the upstream capability gap
+are documented in [Live desktop thread handoff](docs/live-thread-handoff.md).
+
+SSH fallback, tmux/session orchestration, trusted-network automation, and a
+dedicated remote-development server are outside this project's scope.
+
 ## What it is useful for
 
 Use this when you want to reach Codex running on your Mac from another authorized device, such as the ChatGPT iOS app, without leaving Remote Control enabled while you are actively using the Mac.
 
 It is particularly useful for a MacBook that acts as an occasional remote development machine while docked or charging.
 
-Remote availability does not currently guarantee takeover of a conversation
-that is still owned by a live desktop Codex worker. See
-[Live desktop thread handoff](docs/live-thread-handoff.md) for the reproduced
-active-writer conflict, workaround, and candidate idle-worker release design.
+Remote availability does not guarantee automatic takeover of a conversation
+that is still owned by a live desktop Codex worker. Release the terminal session
+with `Ctrl+C` before locking when you want to continue that conversation from
+the phone.
 
 ## Requirements
 
