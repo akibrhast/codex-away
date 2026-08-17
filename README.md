@@ -193,7 +193,8 @@ screen and AC power. The core also defines force-on and force-off modes for a
 future CLI, but they are not exposed to users yet.
 
 Codex Remote and `caffeinate` implement a common managed-service lifecycle.
-Their current health checks cover controller-owned state only: the Codex
-service reads the existing state file, while the `caffeinate` service tracks
-the process it launched. System-wide process discovery and recovery after a
-daemon restart are planned for the observed-state milestone.
+Health checks validate actual process identity and keep observed state separate
+from controller ownership. Legacy state is migrated to versioned ownership
+metadata, and controller-owned `caffeinate` can be safely re-adopted after a
+daemon restart. See [docs/observed-state.md](docs/observed-state.md) for the
+Codex runtime signals, ownership rules, and version assumptions.

@@ -192,7 +192,7 @@ Commit: `d049cd1`
 Current test baseline:
 
 ```text
-25 tests passing
+49 tests passing
 ```
 
 These abstractions are retained because they directly support reliability.
@@ -347,8 +347,8 @@ Persisted state should never be treated as definitive proof that a service is al
 ### Current Codex CLI constraint
 
 As of Codex `0.147.0`, `codex remote-control` provides `start`, `stop`, and
-`pair`, but no documented `status` command. Milestone 3 must therefore begin
-with a discovery spike and tests rather than assuming a status API exists.
+`pair`, but no documented `status` command. Milestone 3 therefore began with a
+discovery spike and tests rather than assuming a status API exists.
 
 Candidate observed-state signals, in preferred order:
 
@@ -1082,7 +1082,7 @@ Delivered in `d049cd1`:
 - injectable system boundaries
 - service and reconciliation tests
 
-Current limitation:
+Milestone 2 limitation, resolved by Milestone 3:
 
 ```text
 Codex health still reflects the historical state file.
@@ -1091,22 +1091,26 @@ caffeinate health still reflects the current in-memory Process object.
 
 ---
 
-## Milestone 3 — Real Observed State — NEXT
+## Milestone 3 — Real Observed State — COMPLETED
 
-Start with a discovery spike because the installed Codex CLI has no documented
-`remote-control status` command.
+The discovery spike confirmed that the installed Codex CLI has no documented
+`remote-control status` command. Observed state therefore uses Codex-owned
+runtime metadata plus exact kernel process identity.
 
-- identify and validate an authoritative Codex runtime signal
-- define exact process identity without matching unrelated Codex processes
-- treat the historical `"on"` state only as an ownership hint
-- inspect whether controller-owned `caffeinate` survives or becomes orphaned
-- validate recorded PIDs against executable identity and arguments
-- reconstruct observed state after controller restart
-- add stale-state and false-positive tests
-- document any Codex-version assumptions
+- validates `remoteControlEnabled`, Codex PID metadata, executable, arguments,
+  and process start time
+- separates observed health from controller ownership
+- treats the historical `"on"` state only as a migrated ownership hint
+- persists versioned service ownership metadata atomically
+- records and validates PID, executable, arguments, and start identity
+- re-adopts an exact controller-owned `caffeinate` after controller restart
+- rejects missing, stale, reused, or mismatched PIDs without signaling them
+- never treats interactive or editor Codex processes as Remote Control
+- documents Codex 0.147.0 runtime assumptions in `docs/observed-state.md`
+- adds process, persistence, migration, runtime-fixture, and ownership tests
 
-Do not add retries, backoff, or periodic monitoring yet. First make one
-inspection accurate and safe.
+Retries, backoff, periodic monitoring, and process-exit recovery remain outside
+this milestone.
 
 Success:
 
@@ -1117,7 +1121,7 @@ service is actually running without confusing unrelated processes for its own.
 
 ---
 
-## Milestone 4 — Async Commands and Timeouts
+## Milestone 4 — Async Commands and Timeouts — NEXT
 
 - move external command execution away from the main event loop
 - use a serialized reconciliation actor/task

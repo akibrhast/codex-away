@@ -39,35 +39,11 @@ public final class ProcessCommandRunner: CommandRunning {
 }
 
 @MainActor
-public protocol ServiceStatePersisting {
-    func read() -> String
-    func write(_ state: String)
-}
-
-@MainActor
-public final class FileServiceStateStore: ServiceStatePersisting {
-    private let fileURL: URL
-
-    public init(fileURL: URL) {
-        self.fileURL = fileURL
-    }
-
-    public func read() -> String {
-        (try? String(contentsOf: fileURL, encoding: .utf8))?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? "unknown"
-    }
-
-    public func write(_ state: String) {
-        try? state.write(to: fileURL, atomically: true, encoding: .utf8)
-    }
-}
-
-@MainActor
 public protocol LongRunningProcess: AnyObject {
     var isRunning: Bool { get }
     var processIdentifier: Int32 { get }
 
-    func start(executable: String, arguments: [String]) throws
+    func start(executable: String, arguments: [String]) throws -> ProcessIdentity
     func terminateAndWait()
 }
 
@@ -85,12 +61,24 @@ public final class FoundationLongRunningProcess: LongRunningProcess {
     public var isRunning: Bool { process.isRunning }
     public var processIdentifier: Int32 { process.processIdentifier }
 
-    public func start(executable: String, arguments: [String]) throws {
+    public func start(executable: String, arguments: [String]) throws -> ProcessIdentity {
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         try process.run()
+        guard let identity = DarwinProcessInspector().inspect(
+            processIdentifier: process.processIdentifier
+        ) else {
+            process.terminate()
+            process.waitUntilExit()
+            throw ServiceOperationError(
+                serviceID: "process",
+                operation: .start,
+                message: "could not inspect launched process"
+            )
+        }
+        return identity
     }
 
     public func terminateAndWait() {

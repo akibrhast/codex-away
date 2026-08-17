@@ -18,16 +18,31 @@ final class Controller {
         let serviceLogger: ServiceLogger = { [weak self] message in
             self?.log(message)
         }
+        let processInspector = DarwinProcessInspector()
+        let ownershipStore = FileServiceOwnershipStore(
+            fileURL: stateDirectory.appendingPathComponent("service-ownership.json"),
+            legacyCodexStateURL: stateDirectory.appendingPathComponent("state")
+        )
         let commandRunner = ProcessCommandRunner(logger: serviceLogger)
+        let codexDaemonDirectory = homeDirectory.appendingPathComponent(".codex/app-server-daemon")
         let codexRemote = CodexRemoteService(
             executable: codex,
             outputURL: logFile,
             commandRunner: commandRunner,
-            stateStore: FileServiceStateStore(fileURL: stateDirectory.appendingPathComponent("state")),
+            runtimeInspector: FileCodexRuntimeInspector(
+                settingsURL: codexDaemonDirectory.appendingPathComponent("settings.json"),
+                pidURL: codexDaemonDirectory.appendingPathComponent("app-server-updater.pid"),
+                expectedExecutable: codex,
+                processInspector: processInspector
+            ),
+            ownershipStore: ownershipStore,
             logger: serviceLogger
         )
         let caffeinate = CaffeinateService(
             processFactory: FoundationLongRunningProcessFactory(),
+            processInspector: processInspector,
+            processSignaler: DarwinProcessSignaler(),
+            ownershipStore: ownershipStore,
             logger: serviceLogger
         )
         return ServiceReconciler(services: [codexRemote, caffeinate])

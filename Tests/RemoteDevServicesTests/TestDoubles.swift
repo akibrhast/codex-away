@@ -18,22 +18,67 @@ final class MockCommandRunner: CommandRunning {
     }
 }
 
+func makeIdentity(
+    pid: Int32 = 42,
+    executable: String = "/usr/bin/caffeinate",
+    arguments: [String] = ["-s"],
+    seconds: UInt64 = 1_700_000_000,
+    microseconds: UInt64 = 123
+) -> ProcessIdentity {
+    ProcessIdentity(
+        processIdentifier: pid,
+        executablePath: executable,
+        arguments: arguments,
+        startTimeSeconds: seconds,
+        startTimeMicroseconds: microseconds
+    )
+}
+
 @MainActor
-final class MockStateStore: ServiceStatePersisting {
-    var state: String
-    private(set) var writes: [String] = []
+final class MockOwnershipStore: ServiceOwnershipPersisting {
+    var records: [String: ServiceOwnershipRecord] = [:]
+    private(set) var saves: [(String, ServiceOwnershipRecord)] = []
 
-    init(state: String) {
-        self.state = state
+    func load(serviceID: String) -> ServiceOwnershipRecord? {
+        records[serviceID]
     }
 
-    func read() -> String {
-        state
+    func save(_ record: ServiceOwnershipRecord, serviceID: String) {
+        records[serviceID] = record
+        saves.append((serviceID, record))
+    }
+}
+
+@MainActor
+final class MockProcessInspector: ProcessInspecting {
+    var identities: [Int32: ProcessIdentity] = [:]
+
+    func inspect(processIdentifier: Int32) -> ProcessIdentity? {
+        identities[processIdentifier]
+    }
+}
+
+@MainActor
+final class MockCodexRuntimeInspector: CodexRuntimeInspecting {
+    var observations: [CodexRuntimeObservation]
+
+    init(_ observations: [CodexRuntimeObservation]) {
+        self.observations = observations
     }
 
-    func write(_ state: String) {
-        self.state = state
-        writes.append(state)
+    func inspect() -> CodexRuntimeObservation {
+        observations.count > 1 ? observations.removeFirst() : observations[0]
+    }
+}
+
+@MainActor
+final class MockProcessSignaler: ProcessSignaling {
+    var result = true
+    private(set) var terminatedPIDs: [Int32] = []
+
+    func terminate(processIdentifier: Int32) -> Bool {
+        terminatedPIDs.append(processIdentifier)
+        return result
     }
 }
 
@@ -45,20 +90,23 @@ enum MockProcessError: Error, Equatable {
 final class MockLongRunningProcess: LongRunningProcess {
     var isRunning = false
     let processIdentifier: Int32
+    let identity: ProcessIdentity
     var startError: Error?
     private(set) var starts: [(String, [String])] = []
     private(set) var terminateCount = 0
 
     init(processIdentifier: Int32 = 42) {
         self.processIdentifier = processIdentifier
+        identity = makeIdentity(pid: processIdentifier)
     }
 
-    func start(executable: String, arguments: [String]) throws {
+    func start(executable: String, arguments: [String]) throws -> ProcessIdentity {
         starts.append((executable, arguments))
         if let startError {
             throw startError
         }
         isRunning = true
+        return identity
     }
 
     func terminateAndWait() {
