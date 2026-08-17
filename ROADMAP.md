@@ -624,7 +624,31 @@ reconcile
 verify READY
 ```
 
-The goal is recovery from ordinary home-network interruptions.
+The goal includes recovery from ordinary network interruptions and explicitly
+tracks captive-portal sessions as a separate failure mode.
+
+### Captive-portal idle-session edge case
+
+Real scenario: the Mac is left locked at a dedicated library seat on a guest
+network such as UVA Guest while the user leaves for several hours. The guest
+portal may expire or sign out an idle session before the user attempts to
+connect from a phone. The Mac can remain associated with Wi-Fi while no longer
+having usable internet access, making Remote Control unreachable.
+
+Milestone 8 must not equate Wi-Fi association with network availability. It
+must investigate and distinguish:
+
+- Wi-Fi disconnected
+- Wi-Fi associated with working internet access
+- Wi-Fi associated but blocked by a captive portal or expired guest session
+- connectivity restored without user interaction
+- connectivity requiring interactive portal reauthentication
+
+The design should determine whether a policy-compliant, low-frequency activity
+check can prevent an idle portal session from expiring. It must not assume that
+automated portal reauthentication is possible or appropriate. If human portal
+interaction is required after expiry, the controller must report that as an
+unrecoverable remote-access condition rather than repeatedly restarting Codex.
 
 ### Not currently needed
 
@@ -1283,6 +1307,13 @@ user returns.
 - add network availability to `MachineState`
 - detect connectivity loss and restoration
 - trigger inspection and reconciliation when connectivity returns
+- detect usable internet connectivity rather than relying only on Wi-Fi link
+  state
+- distinguish captive-portal or expired-session failures from ordinary network
+  loss
+- investigate policy-compliant idle-session prevention for guest networks,
+  including the UVA Guest library scenario
+- avoid restart loops when portal reauthentication requires local interaction
 - avoid SSID allowlists, location policy, or VPN orchestration
 - determine through testing whether network loss should mean ERROR or a
   distinct non-ready condition
@@ -1290,7 +1321,8 @@ user returns.
 Success:
 
 ```text
-Temporary home-network interruptions recover without user intervention.
+Ordinary network interruptions recover without user intervention, while an
+expired captive-portal session is detected and handled without a restart storm.
 ```
 
 ---
