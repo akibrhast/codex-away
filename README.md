@@ -23,6 +23,25 @@ iPhone without carrying a MacBook everywhere “just in case.”
 > Leave your Mac behind without losing the ability to continue working from
 > your phone.
 
+## Install
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/akibrhast/codex-away/main/install.sh | sh
+```
+
+That installs the latest signed universal release, verifies its checksum and
+Developer ID signature, and starts Codex Away automatically. It works on Apple
+Silicon and Intel Macs running macOS 13 or later.
+
+Codex Away expects the official standalone Codex installation and requires
+Codex Remote Control to have been configured once. If Codex is not installed,
+the installer tells you how to add it. `caffeinate` is included with macOS; no
+additional dependency needs to be installed.
+
+After installation, plug in and lock the Mac. Codex Away takes care of the
+rest. See [Troubleshooting](docs/troubleshooting.md) if it does not behave as
+expected.
+
 ## Why this exists
 
 Codex Remote already provides conversations, approvals, authentication, and a
@@ -86,89 +105,6 @@ the Mac remains locked makes the services available again.
 - Runs as a per-user, event-driven macOS LaunchAgent.
 - Requires no custom phone application, relay, or session interface.
 
-## Install
-
-### Requirements
-
-- macOS 13 or later on Apple Silicon or Intel
-- `caffeinate`, included with macOS at `/usr/bin/caffeinate`—there is nothing
-  extra to install
-- The standalone Codex installation managed by the official installer
-- Codex Remote Control configured and tested at least once
-
-The standalone Codex executable must exist at:
-
-```text
-~/.codex/packages/standalone/current/codex
-```
-
-If needed, install Codex with the official installer:
-
-```sh
-curl -fsSL https://chatgpt.com/codex/install.sh | sh
-```
-
-Then verify Remote Control manually:
-
-```sh
-codex remote-control start
-codex remote-control stop
-```
-
-### Install Codex Away
-
-Run the installer:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/akibrhast/codex-away/main/install.sh | sh
-```
-
-The installer downloads the latest universal release from GitHub, verifies its
-SHA-256 checksum and Developer ID signature, installs it for the current user,
-and starts its LaunchAgent automatically. Existing Codex Remote on Lock
-installations are migrated in place: the legacy controller is unloaded, its
-ownership and diagnostic state are preserved, and only the Codex Away
-LaunchAgent remains active.
-
-Installed paths:
-
-```text
-~/Library/Application Support/CodexAway/codex-away
-~/Library/LaunchAgents/com.akibrhast.codex-away.plist
-```
-
-## Verify operation
-
-Check that the listener is loaded:
-
-```sh
-launchctl print "gui/$(id -u)/com.akibrhast.codex-away"
-```
-
-Follow its activity log:
-
-```sh
-tail -f "$HOME/Library/Application Support/CodexAway/controller.log"
-```
-
-While connected to AC power, lock and unlock the Mac. The log should show a
-sequence similar to:
-
-```text
-lock event received
-remote control started
-caffeinate started
-unlock event received
-remote control stopped
-caffeinate stopped
-```
-
-Inspect active power assertions with:
-
-```sh
-pmset -g assertions
-```
-
 ## Reliability
 
 Codex Remote and `caffeinate -s` are managed through a shared service
@@ -211,51 +147,10 @@ the host-availability controller. The verified manual workflow and upstream
 capability gap are documented in
 [Live desktop thread handoff](docs/live-thread-handoff.md).
 
-## Troubleshooting
+## Need help?
 
-### The listener does not start
-
-Inspect the LaunchAgent error log:
-
-```sh
-cat "$HOME/Library/Application Support/CodexAway/launchd-error.log"
-```
-
-Reinstall the latest published release:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/akibrhast/codex-away/main/install.sh | sh
-```
-
-The installer replaces the installed binary and reloads the LaunchAgent.
-
-### A live desktop conversation fails to load remotely
-
-If iOS displays `Error loading messages: Codex server returned an error`, but
-the controller log says Remote Control started successfully, inspect:
-
-```sh
-tail "$HOME/.codex/app-server-daemon/app-server.stderr.log"
-```
-
-An `already has an active writer` error means the Mac is reachable but a live
-desktop worker still owns that conversation. Start a new remote thread or
-release the desktop session before locking. Do not kill arbitrary Codex
-processes.
-
-### Remote commands hang in Desktop or Downloads threads
-
-macOS protects folders such as `Desktop` and `Downloads` with Files and Folders
-privacy controls. A background Codex process may need permission before it can
-resume a thread whose working directory is in one of those locations.
-
-If the Mac is locked, the permission dialog is not visible remotely. Unlock the
-Mac, approve the prompt, and verify the relevant access under **System Settings
-→ Privacy & Security → Files and Folders**. Lock the Mac again and retry with a
-fresh read-only command such as `pwd`.
-
-Full Disk Access is broader than necessary and should not be granted unless the
-narrower Files and Folders permission proves insufficient.
+See the [troubleshooting guide](docs/troubleshooting.md) for verification,
+logs, reinstall steps, conversation handoff issues, and macOS privacy prompts.
 
 ## Uninstall
 
@@ -300,49 +195,8 @@ identities.
 
 ## Development
 
-The project is a Swift package:
-
-```text
-Sources/
-├── RemoteDevCore/       State, policy, and policy evaluation
-├── RemoteDevServices/   Managed services and system boundaries
-└── RemoteDevDaemon/     macOS events and service control
-
-Tests/
-├── RemoteDevCoreTests/      Core policy tests
-└── RemoteDevServicesTests/  Service and reconciliation tests
-```
-
-Run the test suite:
-
-```sh
-swift test
-```
-
-Build the release executable without installing it:
-
-```sh
-swift build --configuration release --product codex-away
-```
-
-Install the current source checkout for local development:
-
-```sh
-./scripts/install-source.sh
-```
-
-Create a signed universal release bundle:
-
-```sh
-CODEX_AWAY_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-  ./scripts/build-release.sh v0.1.0
-```
-
-Release maintainers should follow [Releasing Codex Away](docs/releasing.md) to
-configure signing and notarization secrets and publish versioned artifacts.
-
-Internal Swift target names remain unchanged. They do not affect the public
-product identity.
+Contributors can find the project layout, build commands, test workflow, and
+source-install instructions in the [development guide](docs/development.md).
 
 ## Security
 
